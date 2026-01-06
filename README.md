@@ -14,13 +14,28 @@
 - Автоматический возврат на экран часов через 10 секунд  
 - Поддержка Serial терминалов (Arduino IDE, Putty, TeraTerm)  
 
+**Важно:** при старте платы возможен небольшой таймаут, если WiFi не удаётся подключить — в этом случае часы продолжат работать после завершения попыток подключения.  
+
 ---
 
 ### Аппаратная часть
 - **Микроконтроллер:** ESP32-C3  
 - **Экран:** встроенный 0.42" OLED 72x40 (SSD1306)  
-- **Кнопка BOOT (GPIO9)** — переключение информационных экранов  
+- **BOOT кнопка (GPIO9)** — переключение информационных экранов  
 - **Питание:** 3.3–5V  
+
+---
+
+### Библиотеки
+Для сборки проекта необходимо подключить следующие библиотеки:  
+- `U8g2` — для работы с OLED  
+- `WiFi` — для подключения к сети WiFi  
+- `time` — для синхронизации времени через NTP  
+- `Preferences` — для хранения настроек в энергонезависимой памяти  
+
+**Arduino IDE:**  
+- Выберите плату **ESP32C3 Dev Module**  
+- Убедитесь, что выбран **порт USB в режиме CDC (Serial / COM)** для работы с Serial интерфейсом.
 
 ---
 
@@ -60,6 +75,8 @@ Features:
 - Automatic return to clock screen after 10 seconds  
 - Serial terminal support (Arduino IDE, Putty, TeraTerm)  
 
+**Note:** On startup, a small delay may occur if the board cannot connect to WiFi — the clock will continue working after timeout.  
+
 ---
 
 ### Hardware
@@ -67,6 +84,18 @@ Features:
 - **Display:** built-in 0.42" OLED 72x40 (SSD1306)  
 - **BOOT button (GPIO9)** — switch information screens  
 - **Power supply:** 3.3–5V  
+
+---
+
+### Required Libraries
+- `U8g2` — for OLED display  
+- `WiFi` — for WiFi connectivity  
+- `time` — for NTP synchronization  
+- `Preferences` — for storing settings in non-volatile memory  
+
+**Arduino IDE:**  
+- Select board **ESP32C3 Dev Module**  
+- Make sure the USB port is in **CDC (Serial / COM) mode** for Serial communication
 
 ---
 
