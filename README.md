@@ -1,5 +1,7 @@
 # ESP32-C3 0.42" OLED Часы с WiFi и NTP / ESP32-C3 0.42" OLED Clock with WiFi and NTP
 
+![ESP32-C3 0.42" OLED](https://github.com/CheshirCa/ESP32-C3-Clock/blob/main/ESP32-C3-Clock.jpg)
+
 ## Русский / Russian
 
 ### Описание
