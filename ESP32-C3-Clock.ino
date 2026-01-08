@@ -75,6 +75,14 @@ char weekdayStr[15];
 String serialInput = "";
 bool promptShown = false;
 
+// Command History
+const int HISTORY_SIZE = 10;
+String commandHistory[HISTORY_SIZE];
+int historyIndex = 0;      // Current position in history
+int historyCount = 0;      // Total commands in history
+int historyBrowseIndex = -1; // Index while browsing (-1 = not browsing)
+String tempInput = "";     // Temporary storage while browsing
+
 // Alarm Structure
 struct Alarm {
   bool active = false;
@@ -253,6 +261,62 @@ void updateAlarmIndicator() {
   digitalWrite(BLUE_LED_PIN, shouldBeOn ? LOW : HIGH);
 }
 
+// ================= COMMAND HISTORY FUNCTIONS =================
+void addToHistory(String cmd) {
+  if (cmd.length() == 0) return;
+  
+  // Don't add if same as last command
+  if (historyCount > 0 && commandHistory[(historyIndex - 1 + HISTORY_SIZE) % HISTORY_SIZE] == cmd) {
+    return;
+  }
+  
+  commandHistory[historyIndex] = cmd;
+  historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+  if (historyCount < HISTORY_SIZE) historyCount++;
+}
+
+String getHistoryUp() {
+  if (historyCount == 0) return "";
+  
+  // First time pressing up - save current input
+  if (historyBrowseIndex == -1) {
+    tempInput = serialInput;
+    historyBrowseIndex = (historyIndex - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+  } else {
+    // Move back in history
+    int prevIndex = (historyBrowseIndex - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+    // Check if we've reached the oldest command
+    int oldestIndex = (historyIndex - historyCount + HISTORY_SIZE) % HISTORY_SIZE;
+    if (historyBrowseIndex != oldestIndex) {
+      historyBrowseIndex = prevIndex;
+    }
+  }
+  
+  return commandHistory[historyBrowseIndex];
+}
+
+String getHistoryDown() {
+  if (historyBrowseIndex == -1) return serialInput; // Not browsing
+  
+  int nextIndex = (historyBrowseIndex + 1) % HISTORY_SIZE;
+  
+  // If moving forward to current position, restore temp input
+  if (nextIndex == historyIndex) {
+    historyBrowseIndex = -1;
+    return tempInput;
+  }
+  
+  historyBrowseIndex = nextIndex;
+  return commandHistory[historyBrowseIndex];
+}
+
+void clearCurrentLine() {
+  // Move cursor to start of input and clear it
+  for (int i = 0; i < serialInput.length(); i++) {
+    Serial.print("\b \b");
+  }
+}
+
 // ================= SERIAL COMMAND HANDLER =================
 void handleSerial() {
   if (!promptShown) {
@@ -263,13 +327,58 @@ void handleSerial() {
   while (Serial.available()) {
     char c = Serial.read();
 
+    // Handle ANSI escape sequences (arrow keys)
+    static bool escapeMode = false;
+    static bool bracketMode = false;
+    
+    if (c == 27) { // ESC
+      escapeMode = true;
+      continue;
+    }
+    
+    if (escapeMode) {
+      if (c == '[') {
+        bracketMode = true;
+        continue;
+      }
+      
+      if (bracketMode) {
+        if (c == 'A') { // Up arrow
+          String histCmd = getHistoryUp();
+          if (histCmd.length() > 0) {
+            clearCurrentLine();
+            serialInput = histCmd;
+            Serial.print(serialInput);
+          }
+          escapeMode = false;
+          bracketMode = false;
+          continue;
+        } else if (c == 'B') { // Down arrow
+          String histCmd = getHistoryDown();
+          clearCurrentLine();
+          serialInput = histCmd;
+          Serial.print(serialInput);
+          escapeMode = false;
+          bracketMode = false;
+          continue;
+        } else if (c == 'C' || c == 'D') { // Right/Left arrow - ignore for now
+          escapeMode = false;
+          bracketMode = false;
+          continue;
+        }
+      }
+      escapeMode = false;
+      bracketMode = false;
+      continue;
+    }
+
     // Handle Backspace
     if (c == 8 || c == 127) {
       if (serialInput.length() > 0) {
         serialInput.remove(serialInput.length() - 1);
         Serial.print("\b \b");
       }
-      continue;
+      continue;  // Skip further processing for backspace
     }
 
     Serial.print(c);  // echo
@@ -281,6 +390,8 @@ void handleSerial() {
       }
 
       String cmd = serialInput;
+      addToHistory(cmd); // Add to history
+      historyBrowseIndex = -1; // Reset browse mode
       serialInput = "";
       cmd.trim();
       cmd.toUpperCase();
@@ -454,8 +565,7 @@ void handleSerial() {
         // Timer status
         if (timerActive) {
           uint64_t elapsed = esp_timer_get_time() - timerStartUs;
-          uint64_t remaining = timerDurationUs - elapsed;
-          if (remaining > timerDurationUs) remaining = 0;
+          uint64_t remaining = (elapsed >= timerDurationUs) ? 0 : (timerDurationUs - elapsed);
           int secRemaining = (remaining + 500000) / 1000000;
           int minRemaining = secRemaining / 60;
           secRemaining = secRemaining % 60;
@@ -500,7 +610,7 @@ void handleSerial() {
         updateAlarmIndicator();
         Serial.println("Alarm cleared");
       }
-      // SET ALARM command (new format)
+      // SET ALARM command (improved format)
       else if (cmd.startsWith("ALARM ")) {
         String s = cmd.substring(6);
         s.trim();
@@ -510,8 +620,8 @@ void handleSerial() {
         int year = 0, month = 0, day = 0;
         int weekdaysMask = 0;
 
-        // Check for specific date (YYYY-MM-DD)
-        if (s.indexOf('-') == 4) {
+        // Check for specific date (YYYY-MM-DD) - must have exactly 2 dashes at positions 4 and 7
+        if (s.length() >= 10 && s.charAt(4) == '-' && s.charAt(7) == '-') {
           dateType = 1;
           year = s.substring(0, 4).toInt();
           month = s.substring(5, 7).toInt();
@@ -519,24 +629,46 @@ void handleSerial() {
           s = s.substring(11);  // Remove date part
           s.trim();
         }
-        // Check for weekdays (digits 1-7)
+        // Check for weekdays (only digits 1-7 without colons)
         else if (s.length() > 0 && s[0] >= '1' && s[0] <= '7') {
-          dateType = 2;
-          String digits = "";
-          int i = 0;
-          while (i < s.length() && s[i] >= '1' && s[i] <= '7') {
-            digits += s[i];
-            i++;
+          // Check if this is weekdays or time by looking for colon
+          int firstColon = s.indexOf(':');
+          int firstSpace = s.indexOf(' ');
+          
+          // If colon comes before any weekday digits end, it's time not weekdays
+          // Example: "17:00" - colon at position 2, so it's time
+          // Example: "12345 17:00" - space at position 5, colon at 8, so 12345 are weekdays
+          
+          bool isWeekdays = false;
+          if (firstColon == -1) {
+            // No colon at all - can't be valid, but treat first part as weekdays
+            isWeekdays = true;
+          } else if (firstSpace != -1 && firstSpace < firstColon) {
+            // Space before colon - digits before space are weekdays
+            isWeekdays = true;
+          } else {
+            // Colon comes first - this is time, not weekdays
+            isWeekdays = false;
           }
-          s = s.substring(i);
-          s.trim();
+          
+          if (isWeekdays) {
+            dateType = 2;
+            String digits = "";
+            int i = 0;
+            while (i < s.length() && s[i] >= '1' && s[i] <= '7') {
+              digits += s[i];
+              i++;
+            }
+            s = s.substring(i);
+            s.trim();
 
-          // Convert digits to bitmask
-          for (int j = 0; j < digits.length(); j++) {
-            char d = digits[j];
-            if (d >= '1' && d <= '7') {
-              int dayNum = d - '1';  // 0=Mon, 6=Sun
-              weekdaysMask |= (1 << dayNum);
+            // Convert digits to bitmask
+            for (int j = 0; j < digits.length(); j++) {
+              char d = digits[j];
+              if (d >= '1' && d <= '7') {
+                int dayNum = d - '1';  // 0=Mon, 6=Sun
+                weekdaysMask |= (1 << dayNum);
+              }
             }
           }
         }
@@ -569,25 +701,39 @@ void handleSerial() {
         }
 
         // Parse options (R, S, TEXT)
+        // Strategy: first collect all single-letter flags (R, S), then rest is TEXT
         bool repeat = false;
         bool save = false;
-        char text[11] = "";
-        text[0] = '\0';
-
+        String textContent = "";
+        
+        rest.trim();
+        
         while (rest.length() > 0) {
-          rest.trim();
-          if (rest[0] == 'R' && (rest.length() == 1 || rest[1] == ' ')) {
+          // Check if starts with R or S followed by space or end
+          if ((rest[0] == 'R' || rest[0] == 'r') && 
+              (rest.length() == 1 || rest[1] == ' ')) {
             repeat = true;
             rest = rest.substring(1);
-          } else if (rest[0] == 'S' && (rest.length() == 1 || rest[1] == ' ')) {
+            rest.trim();
+          } 
+          else if ((rest[0] == 'S' || rest[0] == 's') && 
+                   (rest.length() == 1 || rest[1] == ' ')) {
             save = true;
             rest = rest.substring(1);
-          } else {
-            // Must be TEXT
-            int len = min((int)rest.length(), 10);
-            rest.substring(0, len).toCharArray(text, sizeof(text));
+            rest.trim();
+          } 
+          else {
+            // Everything else is TEXT
+            textContent = rest;
             break;
           }
+        }
+        
+        // Convert text to char array
+        char text[11] = "";
+        if (textContent.length() > 0) {
+          int len = min((int)textContent.length(), 10);
+          textContent.substring(0, len).toCharArray(text, sizeof(text));
         }
 
         // Set alarm
@@ -619,24 +765,22 @@ void handleSerial() {
           saveAlarmToNVS();
         } else {
           myAlarm.saved = false;
+          updateAlarmIndicator();
         }
-
-        updateAlarmIndicator();
 
         // Print confirmation
         Serial.print("Alarm set for ");
         if (dateType == 1) {
           Serial.printf("%04d-%02d-%02d ", year, month, day);
         } else if (dateType == 2) {
-          Serial.print("Weekdays ");
-          if (weekdaysMask & 0x01) Serial.print("Mon");
-          if (weekdaysMask & 0x02) Serial.print("Tue");
-          if (weekdaysMask & 0x04) Serial.print("Wed");
-          if (weekdaysMask & 0x08) Serial.print("Thu");
-          if (weekdaysMask & 0x10) Serial.print("Fri");
-          if (weekdaysMask & 0x20) Serial.print("Sat");
-          if (weekdaysMask & 0x40) Serial.print("Sun");
-          Serial.print(" ");
+          Serial.print("Weekdays: ");
+          if (weekdaysMask & 0x01) Serial.print("Mon ");
+          if (weekdaysMask & 0x02) Serial.print("Tue ");
+          if (weekdaysMask & 0x04) Serial.print("Wed ");
+          if (weekdaysMask & 0x08) Serial.print("Thu ");
+          if (weekdaysMask & 0x10) Serial.print("Fri ");
+          if (weekdaysMask & 0x20) Serial.print("Sat ");
+          if (weekdaysMask & 0x40) Serial.print("Sun ");
         } else {
           Serial.print("Daily ");
         }
@@ -654,7 +798,7 @@ void handleSerial() {
         digitalWrite(BUZZER_PIN, LOW);
         Serial.println("Timer cleared");
       }
-      // SET TIMER command (new format)
+      // SET TIMER command (improved format - removed 1 hour limit)
       else if (cmd.startsWith("TIMER ")) {
         String s = cmd.substring(6);
         s.trim();
@@ -703,15 +847,22 @@ void handleSerial() {
 
         // Validate
         if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
-          Serial.println("Invalid time values");
+          Serial.println("Invalid time values (Hours: 0-23, Minutes: 0-59, Seconds: 0-59)");
           Serial.print("> ");
           return;
         }
 
         unsigned long totalSec = (unsigned long)hour * 3600 + (unsigned long)minute * 60 + (unsigned long)second;
 
-        if (totalSec == 0 || totalSec > 3600) {
-          Serial.println("Timer must be 1 second to 1 hour");
+        if (totalSec == 0) {
+          Serial.println("Timer must be at least 1 second");
+          Serial.print("> ");
+          return;
+        }
+
+        // Maximum ~24 hours (86400 seconds)
+        if (totalSec > 86400) {
+          Serial.println("Timer maximum is 24 hours");
           Serial.print("> ");
           return;
         }
@@ -743,7 +894,7 @@ void handleSerial() {
         }
         Serial.println();
       }
-      // === СКРЫТЫЕ ДЕБАГ-КОМАНДЫ (не выводятся в HELP) ===
+      // Hidden debug commands (not shown in HELP)
       else if (cmd.equals("BUZZER ON")) {
         buzzerActive = true;
         Serial.println("Buzzer ON");
@@ -864,8 +1015,7 @@ void drawInfoScreen1() {
   u8g2.setCursor(X_OFF, y);
   if (timerActive) {
     uint64_t elapsed = esp_timer_get_time() - timerStartUs;
-    uint64_t remaining = timerDurationUs - elapsed;
-    if (remaining > timerDurationUs) remaining = 0;
+    uint64_t remaining = (elapsed >= timerDurationUs) ? 0 : (timerDurationUs - elapsed);
     int secRemaining = (remaining + 500000) / 1000000;
     u8g2.printf("Timer: %02d sec", secRemaining);
   } else {
@@ -1103,10 +1253,27 @@ void loop() {
     }
   }
 
-  // Buzzer control
+  // Buzzer control - alarm pattern: beep-pause-beep-pause-beep-long pause
   if (buzzerActive) {
-    uint64_t phase = esp_timer_get_time() % 5000000;
-    bool on = (phase < 1000000) || (phase >= 2000000 && phase < 3000000);
+    uint64_t phase = esp_timer_get_time() % 2000000;  // 2 second cycle
+    bool on = false;
+    
+    // First beep: 0-150ms
+    if (phase < 150000) {
+      on = true;
+    }
+    // Pause: 150-300ms
+    // Second beep: 300-450ms
+    else if (phase >= 300000 && phase < 450000) {
+      on = true;
+    }
+    // Pause: 450-600ms
+    // Third beep: 600-750ms
+    else if (phase >= 600000 && phase < 750000) {
+      on = true;
+    }
+    // Long pause: 750-2000ms
+    
     digitalWrite(BUZZER_PIN, on ? HIGH : LOW);
   } else {
     digitalWrite(BUZZER_PIN, LOW);
