@@ -1,9 +1,13 @@
 #include <U8g2lib.h>
 #include <WiFi.h>
+#include <WebServer.h>
 #include <time.h>
 #include <Wire.h>
 #include <Preferences.h>
 #include <esp_timer.h>
+
+// Web Server
+WebServer server(80);
 
 // OLED Display (70x40)
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 6, 5);
@@ -94,7 +98,7 @@ struct Alarm {
   int minute = 0;       // 0-59
   bool repeat = false;  // Repeat after trigger
   bool saved = false;   // Save to NVS
-  char text[11] = "";   // Alarm text (max 10 chars)
+  char text[31] = "";   // Alarm text (max 30 bytes for UTF-8, ~10-15 cyrillic chars)
 };
 Alarm myAlarm;
 
@@ -102,7 +106,7 @@ Alarm myAlarm;
 bool timerActive = false;
 uint64_t timerStartUs = 0;
 uint64_t timerDurationUs = 0;
-char timerText[11] = "";
+char timerText[31] = "";  // Timer text (max 30 bytes for UTF-8)
 
 // Trigger Flags
 bool timerTriggered = false;
@@ -153,6 +157,15 @@ void setup() {
   connectWiFi();
   syncTime();
   updateClockStrings();
+  
+  // Start Web Server
+  setupWebServer();
+  server.begin();
+  Serial.println("Web server started");
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("Open browser at: http://");
+    Serial.println(WiFi.localIP());
+  }
 }
 
 // ================= NVS FUNCTIONS =================
@@ -320,6 +333,644 @@ void clearCurrentLine() {
   for (int i = 0; i < serialInput.length(); i++) {
     Serial.print("\b \b");
   }
+}
+
+// ================= WEB SERVER FUNCTIONS =================
+String getStatusJSON() {
+  // Ensure we have current time data
+  if (getLocalTime(&timeinfo) && timeinfo.tm_year > 120) {
+    timeValid = true;
+    updateClockStrings();
+  }
+  
+  String json = "{";
+  json += "\"time\":\"" + String(hhStr) + ":" + String(mmStr) + "\",";
+  json += "\"date\":\"" + String(dateStr) + "\",";
+  json += "\"weekday\":\"" + String(weekdayStr) + "\",";
+  json += "\"wifi\":\"" + String(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected") + "\",";
+  json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
+  json += "\"timeSync\":" + String(timeValid ? "true" : "false") + ",";
+  json += "\"freeRam\":" + String(esp_get_free_heap_size() / 1024) + ",";
+  
+  // Alarm info
+  json += "\"alarm\":{";
+  json += "\"active\":" + String(myAlarm.active ? "true" : "false");
+  if (myAlarm.active) {
+    json += ",\"hour\":" + String(myAlarm.hour);
+    json += ",\"minute\":" + String(myAlarm.minute);
+    json += ",\"text\":\"" + String(myAlarm.text) + "\"";
+    json += ",\"repeat\":" + String(myAlarm.repeat ? "true" : "false");
+    json += ",\"saved\":" + String(myAlarm.saved ? "true" : "false");
+    
+    if (myAlarm.year > 0) {
+      json += ",\"type\":\"date\"";
+      json += ",\"date\":\"" + String(myAlarm.year) + "-";
+      if (myAlarm.month < 10) json += "0";
+      json += String(myAlarm.month) + "-";
+      if (myAlarm.day < 10) json += "0";
+      json += String(myAlarm.day) + "\"";
+    } else if (myAlarm.weekdays > 0) {
+      json += ",\"type\":\"weekdays\"";
+      json += ",\"weekdays\":" + String(myAlarm.weekdays);
+    } else {
+      json += ",\"type\":\"daily\"";
+    }
+  }
+  json += "},";
+  
+  // Timer info
+  json += "\"timer\":{";
+  json += "\"active\":" + String(timerActive ? "true" : "false");
+  if (timerActive) {
+    uint64_t elapsed = esp_timer_get_time() - timerStartUs;
+    uint64_t remaining = (elapsed >= timerDurationUs) ? 0 : (timerDurationUs - elapsed);
+    int secRemaining = (remaining + 500000) / 1000000;
+    json += ",\"remaining\":" + String(secRemaining);
+    json += ",\"text\":\"" + String(timerText) + "\"";
+  }
+  json += "}";
+  
+  json += "}";
+  return json;
+}
+
+String getWebPage() {
+  String html = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32-C3 Clock</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 2em;
+    }
+    h2 {
+      color: #667eea;
+      margin-bottom: 16px;
+      font-size: 1.5em;
+    }
+    .clock-display {
+      text-align: center;
+      font-size: 3em;
+      font-weight: bold;
+      color: #667eea;
+      margin: 20px 0;
+    }
+    .date-display {
+      text-align: center;
+      font-size: 1.2em;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .status-item {
+      padding: 12px;
+      background: #f7f7f7;
+      border-radius: 8px;
+    }
+    .status-label {
+      font-size: 0.85em;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .status-value {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #555;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 1em;
+      transition: border-color 0.3s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .checkbox-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .checkbox-label input {
+      width: auto;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 1em;
+      cursor: pointer;
+      transition: background 0.3s;
+      width: 100%;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    button.danger {
+      background: #ef4444;
+    }
+    button.danger:hover {
+      background: #dc2626;
+    }
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .alarm-info, .timer-info {
+      background: #f0f9ff;
+      border-left: 4px solid #667eea;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 12px;
+    }
+    .inactive {
+      background: #f7f7f7;
+      border-left-color: #ccc;
+    }
+    @media (max-width: 600px) {
+      .clock-display { font-size: 2em; }
+      h1 { font-size: 1.5em; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⏰ ESP32-C3 Clock</h1>
+    
+    <div class="card">
+      <div class="clock-display" id="clock">--:--</div>
+      <div class="date-display" id="date">Loading...</div>
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="status-label">WiFi</div>
+          <div class="status-value" id="wifi">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">IP Address</div>
+          <div class="status-value" id="ip">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Time Sync</div>
+          <div class="status-value" id="sync">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Free RAM</div>
+          <div class="status-value" id="ram">--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🔔 Alarm</h2>
+      <div id="alarmStatus" class="alarm-info inactive">No alarm set</div>
+      
+      <div class="form-group">
+        <label>Alarm Type</label>
+        <select id="alarmType" onchange="updateAlarmFields()">
+          <option value="daily">Daily</option>
+          <option value="weekdays">Weekdays</option>
+          <option value="date">Specific Date</option>
+        </select>
+      </div>
+      
+      <div id="dateField" style="display:none;" class="form-group">
+        <label>Date</label>
+        <input type="date" id="alarmDate">
+      </div>
+      
+      <div id="weekdaysField" style="display:none;" class="form-group">
+        <label>Select Days</label>
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" value="1"> Mon</label>
+          <label class="checkbox-label"><input type="checkbox" value="2"> Tue</label>
+          <label class="checkbox-label"><input type="checkbox" value="4"> Wed</label>
+          <label class="checkbox-label"><input type="checkbox" value="8"> Thu</label>
+          <label class="checkbox-label"><input type="checkbox" value="16"> Fri</label>
+          <label class="checkbox-label"><input type="checkbox" value="32"> Sat</label>
+          <label class="checkbox-label"><input type="checkbox" value="64"> Sun</label>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Time</label>
+        <input type="time" id="alarmTime">
+      </div>
+      
+      <div class="form-group">
+        <label>Text (optional, max 10 chars)</label>
+        <input type="text" id="alarmText" maxlength="30" placeholder="Wake up / Подъём">
+      </div>
+      
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="alarmRepeat"> Repeat after trigger
+        </label>
+      </div>
+      
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="alarmSave"> Save to NVS
+        </label>
+      </div>
+      
+      <div class="btn-group">
+        <button onclick="setAlarm()">Set Alarm</button>
+        <button class="danger" onclick="clearAlarm()">Clear Alarm</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⏲️ Timer</h2>
+      <div id="timerStatus" class="timer-info inactive">No timer active</div>
+      
+      <div class="form-group">
+        <label>Duration</label>
+        <input type="time" id="timerTime" step="1" value="00:05:00">
+      </div>
+      
+      <div class="form-group">
+        <label>Text (optional, max 10 chars)</label>
+        <input type="text" id="timerText" maxlength="30" placeholder="Timer / Таймер">
+      </div>
+      
+      <div class="btn-group">
+        <button onclick="setTimer()">Start Timer</button>
+        <button class="danger" onclick="clearTimer()">Clear Timer</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function updateStatus() {
+      fetch('/status')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('clock').textContent = data.time;
+          document.getElementById('date').textContent = data.date + ' • ' + data.weekday;
+          document.getElementById('wifi').textContent = data.wifi;
+          document.getElementById('ip').textContent = data.ip;
+          document.getElementById('sync').textContent = data.timeSync ? 'Synced' : 'Not synced';
+          document.getElementById('ram').textContent = data.freeRam + ' KB';
+          
+          // Alarm status
+          const alarmDiv = document.getElementById('alarmStatus');
+          if (data.alarm.active) {
+            let alarmText = 'Alarm: ';
+            if (data.alarm.type === 'date') alarmText += data.alarm.date + ' ';
+            else if (data.alarm.type === 'weekdays') alarmText += 'Weekdays ';
+            else alarmText += 'Daily ';
+            alarmText += (data.alarm.hour < 10 ? '0' : '') + data.alarm.hour + ':';
+            alarmText += (data.alarm.minute < 10 ? '0' : '') + data.alarm.minute;
+            if (data.alarm.text) alarmText += ' "' + data.alarm.text + '"';
+            if (data.alarm.repeat) alarmText += ' [R]';
+            if (data.alarm.saved) alarmText += ' [S]';
+            alarmDiv.textContent = alarmText;
+            alarmDiv.className = 'alarm-info';
+          } else {
+            alarmDiv.textContent = 'No alarm set';
+            alarmDiv.className = 'alarm-info inactive';
+          }
+          
+          // Timer status
+          const timerDiv = document.getElementById('timerStatus');
+          if (data.timer.active) {
+            const min = Math.floor(data.timer.remaining / 60);
+            const sec = data.timer.remaining % 60;
+            let timerText = 'Timer: ' + min + ':' + (sec < 10 ? '0' : '') + sec + ' remaining';
+            if (data.timer.text && data.timer.text !== 'TIMER') timerText += ' "' + data.timer.text + '"';
+            timerDiv.textContent = timerText;
+            timerDiv.className = 'timer-info';
+          } else {
+            timerDiv.textContent = 'No timer active';
+            timerDiv.className = 'timer-info inactive';
+          }
+        });
+    }
+    
+    function updateAlarmFields() {
+      const type = document.getElementById('alarmType').value;
+      document.getElementById('dateField').style.display = type === 'date' ? 'block' : 'none';
+      document.getElementById('weekdaysField').style.display = type === 'weekdays' ? 'block' : 'none';
+    }
+    
+    function setAlarm() {
+      const type = document.getElementById('alarmType').value;
+      const time = document.getElementById('alarmTime').value;
+      const text = document.getElementById('alarmText').value;
+      const repeat = document.getElementById('alarmRepeat').checked;
+      const save = document.getElementById('alarmSave').checked;
+      
+      if (!time) {
+        alert('Please set alarm time');
+        return;
+      }
+      
+      let url = '/alarm?time=' + time;
+      url += '&type=' + type;
+      
+      if (type === 'date') {
+        const date = document.getElementById('alarmDate').value;
+        if (!date) {
+          alert('Please select a date');
+          return;
+        }
+        url += '&date=' + date;
+      } else if (type === 'weekdays') {
+        const checks = document.querySelectorAll('#weekdaysField input:checked');
+        if (checks.length === 0) {
+          alert('Please select at least one day');
+          return;
+        }
+        let mask = 0;
+        checks.forEach(c => mask += parseInt(c.value));
+        url += '&weekdays=' + mask;
+      }
+      
+      if (text) url += '&text=' + encodeURIComponent(text);
+      if (repeat) url += '&repeat=1';
+      if (save) url += '&save=1';
+      
+      fetch(url)
+        .then(r => r.text())
+        .then(data => {
+          alert(data);
+          updateStatus();
+        });
+    }
+    
+    function clearAlarm() {
+      fetch('/alarm/clear')
+        .then(r => r.text())
+        .then(data => {
+          alert(data);
+          updateStatus();
+        });
+    }
+    
+    function setTimer() {
+      const time = document.getElementById('timerTime').value;
+      const text = document.getElementById('timerText').value;
+      
+      if (!time) {
+        alert('Please set timer duration');
+        return;
+      }
+      
+      const parts = time.split(':');
+      const hours = parseInt(parts[0]);
+      const minutes = parseInt(parts[1]);
+      const seconds = parseInt(parts[2] || 0);
+      const totalSec = hours * 3600 + minutes * 60 + seconds;
+      
+      if (totalSec === 0) {
+        alert('Timer must be at least 1 second');
+        return;
+      }
+      
+      let url = '/timer?duration=' + totalSec;
+      if (text) url += '&text=' + encodeURIComponent(text);
+      
+      fetch(url)
+        .then(r => r.text())
+        .then(data => {
+          alert(data);
+          updateStatus();
+        });
+    }
+    
+    function clearTimer() {
+      fetch('/timer/clear')
+        .then(r => r.text())
+        .then(data => {
+          alert(data);
+          updateStatus();
+        });
+    }
+    
+    updateStatus();
+    setInterval(updateStatus, 2000);
+  </script>
+</body>
+</html>
+)rawliteral";
+  return html;
+}
+
+void setupWebServer() {
+  // Main page
+  server.on("/", HTTP_GET, []() {
+    server.send(200, "text/html; charset=utf-8", getWebPage());
+  });
+  
+  // Status API
+  server.on("/status", HTTP_GET, []() {
+    server.send(200, "application/json; charset=utf-8", getStatusJSON());
+  });
+  
+  // Set alarm
+  server.on("/alarm", HTTP_GET, []() {
+    if (!timeValid) {
+      server.send(400, "text/plain; charset=utf-8", "Wait for time sync!");
+      return;
+    }
+    
+    String timeStr = server.arg("time");
+    String type = server.arg("type");
+    
+    if (timeStr.length() == 0) {
+      server.send(400, "text/plain; charset=utf-8", "Missing time parameter");
+      return;
+    }
+    
+    int hour = timeStr.substring(0, 2).toInt();
+    int minute = timeStr.substring(3, 5).toInt();
+    
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      server.send(400, "text/plain; charset=utf-8", "Invalid time");
+      return;
+    }
+    
+    myAlarm.active = true;
+    myAlarm.hour = hour;
+    myAlarm.minute = minute;
+    myAlarm.repeat = server.hasArg("repeat");
+    alarmTriggered = false;
+    
+    // Decode URL-encoded text (supports UTF-8)
+    String text = server.arg("text");
+    if (text.length() > 0) {
+      // URL decode
+      text.replace("+", " ");
+      String decoded = "";
+      for (int i = 0; i < text.length(); i++) {
+        if (text[i] == '%' && i + 2 < text.length()) {
+          String hex = text.substring(i + 1, i + 3);
+          char c = strtol(hex.c_str(), NULL, 16);
+          decoded += c;
+          i += 2;
+        } else {
+          decoded += text[i];
+        }
+      }
+      // Limit to 30 bytes (for UTF-8 strings)
+      int byteCount = 0;
+      for (int i = 0; i < decoded.length() && byteCount < 30; i++) {
+        myAlarm.text[byteCount++] = decoded[i];
+      }
+      myAlarm.text[byteCount] = '\0';
+    } else {
+      myAlarm.text[0] = '\0';
+    }
+    
+    if (type == "date") {
+      String dateStr = server.arg("date");
+      myAlarm.year = dateStr.substring(0, 4).toInt();
+      myAlarm.month = dateStr.substring(5, 7).toInt();
+      myAlarm.day = dateStr.substring(8, 10).toInt();
+      myAlarm.weekdays = 0;
+    } else if (type == "weekdays") {
+      myAlarm.year = 0;
+      myAlarm.month = 0;
+      myAlarm.day = 0;
+      myAlarm.weekdays = server.arg("weekdays").toInt();
+    } else {
+      myAlarm.year = 0;
+      myAlarm.month = 0;
+      myAlarm.day = 0;
+      myAlarm.weekdays = 0;
+    }
+    
+    if (server.hasArg("save")) {
+      saveAlarmToNVS();
+    } else {
+      myAlarm.saved = false;
+      updateAlarmIndicator();
+    }
+    
+    server.send(200, "text/plain; charset=utf-8", "Alarm set successfully");
+  });
+  
+  // Clear alarm
+  server.on("/alarm/clear", HTTP_GET, []() {
+    memset(&myAlarm, 0, sizeof(myAlarm));
+    alarmTriggered = false;
+    buzzerActive = false;
+    digitalWrite(BUZZER_PIN, LOW);
+    clearAlarmFromNVS();
+    updateAlarmIndicator();
+    server.send(200, "text/plain; charset=utf-8", "Alarm cleared");
+  });
+  
+  // Set timer
+  server.on("/timer", HTTP_GET, []() {
+    String durationStr = server.arg("duration");
+    
+    if (durationStr.length() == 0) {
+      server.send(400, "text/plain; charset=utf-8", "Missing duration parameter");
+      return;
+    }
+    
+    unsigned long totalSec = durationStr.toInt();
+    
+    if (totalSec == 0 || totalSec > 86400) {
+      server.send(400, "text/plain; charset=utf-8", "Timer must be 1-86400 seconds");
+      return;
+    }
+    
+    // Decode URL-encoded text (supports UTF-8)
+    String text = server.arg("text");
+    if (text.length() > 0) {
+      text.replace("+", " ");
+      String decoded = "";
+      for (int i = 0; i < text.length(); i++) {
+        if (text[i] == '%' && i + 2 < text.length()) {
+          String hex = text.substring(i + 1, i + 3);
+          char c = strtol(hex.c_str(), NULL, 16);
+          decoded += c;
+          i += 2;
+        } else {
+          decoded += text[i];
+        }
+      }
+      // Limit to 30 bytes (for UTF-8 strings)
+      int byteCount = 0;
+      for (int i = 0; i < decoded.length() && byteCount < 30; i++) {
+        timerText[byteCount++] = decoded[i];
+      }
+      timerText[byteCount] = '\0';
+    } else {
+      strcpy(timerText, "TIMER");
+    }
+    
+    timerActive = true;
+    timerTriggered = false;
+    timerStartUs = esp_timer_get_time();
+    timerDurationUs = (uint64_t)totalSec * 1000000;
+    
+    server.send(200, "text/plain; charset=utf-8", "Timer started");
+  });
+  
+  // Clear timer
+  server.on("/timer/clear", HTTP_GET, []() {
+    timerActive = false;
+    timerTriggered = false;
+    buzzerActive = false;
+    digitalWrite(BUZZER_PIN, LOW);
+    server.send(200, "text/plain; charset=utf-8", "Timer cleared");
+  });
 }
 
 // ================= SERIAL COMMAND HANDLER =================
@@ -736,10 +1387,10 @@ void handleSerial() {
           }
         }
         
-        // Convert text to char array
-        char text[11] = "";
+        // Convert text to char array (max 30 bytes for UTF-8)
+        char text[31] = "";
         if (textContent.length() > 0) {
-          int len = min((int)textContent.length(), 10);
+          int len = min((int)textContent.length(), 30);
           textContent.substring(0, len).toCharArray(text, sizeof(text));
         }
 
@@ -877,9 +1528,9 @@ void handleSerial() {
         // Default text
         strcpy(timerText, "TIMER");
 
-        // Parse TEXT
+        // Parse TEXT (max 30 bytes for UTF-8)
         if (rest.length() > 0) {
-          int len = min((int)rest.length(), 10);
+          int len = min((int)rest.length(), 30);
           rest.substring(0, len).toCharArray(timerText, sizeof(timerText));
         }
 
@@ -979,20 +1630,51 @@ void drawAlarmOrTimer(const char* txt) {
   u8g2.clearBuffer();
 
   String s = (txt && txt[0]) ? String(txt) : "ALARM";
-  if (s.length() > 10) s = s.substring(0, 10);
 
-  u8g2.setFont(u8g2_font_7x14_tf);
-
-  int w = u8g2.getStrWidth(s.c_str());
+  // Use smaller font with Cyrillic support for better fit
+  u8g2.setFont(u8g2_font_5x8_t_cyrillic);
+  
+  // For Cyrillic, use getUTF8Width()
+  int w = u8g2.getUTF8Width(s.c_str());
+  
+  // Debug output
+  Serial.print("Text: '");
+  Serial.print(s);
+  Serial.print("', UTF8Width: ");
+  Serial.print(w);
+  
+  // If text is too wide, truncate
+  while (w > DISP_W && s.length() > 0) {
+    // Remove last character (UTF-8 aware)
+    int lastPos = s.length() - 1;
+    // Go back to find UTF-8 character start
+    while (lastPos > 0 && (s[lastPos] & 0xC0) == 0x80) {
+      lastPos--;
+    }
+    s = s.substring(0, lastPos);
+    w = u8g2.getUTF8Width(s.c_str());
+  }
+  
+  // Center within the visible window
   int x = X_OFF + (DISP_W - w) / 2;
-  int y = Y_OFF + 24;
+  int y = Y_OFF + 18;
+  
+  Serial.print(", X: ");
+  Serial.print(x);
+  Serial.print(", Y: ");
+  Serial.print(y);
+  Serial.print(", Width: ");
+  Serial.println(w);
 
-  u8g2.setCursor(x, y);
-  u8g2.print(s);
+  // Use drawUTF8 instead of setCursor + print for proper UTF-8 rendering
+  u8g2.drawUTF8(x, y, s.c_str());
 
-  u8g2.setFont(u8g2_font_5x7_t_cyrillic);
-  u8g2.setCursor(X_OFF, Y_OFF + DISP_H - 1);
-  u8g2.print("BOOT to STOP");
+  // Bottom text with smaller font
+  u8g2.setFont(u8g2_font_4x6_t_cyrillic);
+  String stopMsg = "BOOT-STOP";
+  int stopW = u8g2.getUTF8Width(stopMsg.c_str());
+  int stopX = X_OFF + (DISP_W - stopW) / 2;
+  u8g2.drawUTF8(stopX, Y_OFF + DISP_H - 2, stopMsg.c_str());
 
   u8g2.sendBuffer();
 }
@@ -1219,6 +1901,8 @@ void handleAutoReturn() {
 
 // ================= MAIN LOOP =================
 void loop() {
+  server.handleClient(); // Handle web requests
+  
   handleSerial();
   handleButton();
   handleAutoReturn();
