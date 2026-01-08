@@ -11,6 +11,27 @@
 
 ## Русская версия
 
+## 🆕 Версия 2.0
+
+### Что нового в версии 2.0:
+
+- 🌐 **Веб-интерфейс** - полнофункциональное управление через браузер
+- 🔵 **Улучшенная LED индикация:**
+  - Постоянное свечение = будильник активен
+  - Мигание (500мс) = таймер работает
+- 🔊 **Новый паттерн звукового сигнала:** три коротких пи (150мс) с паузами, затем длинная пауза
+- ⏲️ **Высокоточный таймер** на базе `esp_timer` (точность до микросекунд)
+- 📜 **История команд** в Serial терминале с навигацией стрелками ↑/↓ (10 команд)
+- 🎨 **Улучшенный веб-интерфейс:**
+  - Автообновление данных каждые 2 секунды
+  - Адаптивный дизайн для всех устройств
+  - Полная поддержка UTF-8 (русский язык)
+  - Подтверждение критических операций
+- 🔧 **Расширенное управление:**
+  - Отображение оставшегося времени таймера в реальном времени
+  - Статус синхронизации времени в веб-интерфейсе
+  - Информация о свободной памяти
+
 ### 📋 Описание
 
 Проект часов на базе **ESP32-C3 SuperMini с встроенным OLED-дисплеем 0.42" (72x40 пикселей)**, поддержкой WiFi, NTP-синхронизацией времени, будильником и таймером. Устройство сохраняет настройки в энергонезависимой памяти (NVS) и управляется через серийный терминал, встроенную кнопку BOOT и **веб-интерфейс**.
@@ -31,14 +52,15 @@
   - От 1 секунды до 24 часов
   - С текстовым сообщением
   - Форматы: HH:MM:SS, MM:SS или SS
+  - Высокоточный счёт на базе esp_timer (точность до микросекунд)
 - 💾 **Энергонезависимое хранение** настроек WiFi, часового пояса и будильника
 - 🔵 **Светодиодная индикация:**
   - Постоянное свечение = будильник активен
-  - Мигание = таймер работает
+  - Мигание (500мс) = таймер работает
 - 🔊 **Звуковые сигналы** пьезоизлучателем (паттерн "пи-пи-пи")
 - 📟 **Информационные экраны** с детальной статистикой
 - 🔤 **Поддержка UTF-8** (кириллица и латиница)
-- 📜 **История команд** в Serial терминале (стрелки вверх/вниз)
+- 📜 **История команд** в Serial терминале (стрелки вверх/вниз, 10 команд)
 
 ### 🔧 Аппаратная часть
 
@@ -102,7 +124,7 @@
    - Откройте `http://192.168.x.x` в браузере
    - Управляйте часами через удобный интерфейс!
 
-### 🌐 Веб-интерфейс
+### 🌐 Веб-интерфейс (НОВОЕ в v2.0!)
 
 После подключения к WiFi откройте IP адрес устройства в браузере для доступа к полнофункциональному веб-интерфейсу.
 
@@ -114,6 +136,7 @@
 - WiFi SSID и статус подключения
 - IP адрес
 - Статус синхронизации времени
+- Объём свободной памяти
 
 **🔔 Управление будильником:**
 - Выбор типа: ежедневный / по дням недели / на конкретную дату
@@ -125,7 +148,7 @@
 **⏲️ Управление таймером:**
 - Установка длительности (HH:MM:SS)
 - Текстовое сообщение
-- Отображение оставшегося времени
+- Отображение оставшегося времени в реальном времени
 
 **⚙️ Системные настройки:**
 - Изменение NTP сервера
@@ -148,7 +171,7 @@
 
 **Подключение:** 115200 baud, Newline & Carriage Return (NL&CR)
 
-**История команд:** Используйте стрелки ↑/↓ для навигации по истории (10 последних команд)
+**История команд (НОВОЕ в v2.0!):** Используйте стрелки ↑/↓ для навигации по истории (10 последних команд)
 
 #### Справка и статус
 ```
@@ -326,38 +349,35 @@ RAM: 285 KB
 | Info Screen 2 | 1x нажатие | Возврат на главный экран |
 | Будильник/Таймер | 1x нажатие | Остановить сигнал |
 
-### 💡 Индикация синим светодиодом
+### 💡 Индикация синим светодиодом (УЛУЧШЕНО в v2.0!)
 
-- **Постоянно горит** - будильник установлен и активен
-- **Мигает** (500 мс ВКЛ / 500 мс ВЫКЛ) - таймер работает
-- **Выключен** - ничего не активно или сигнал сработал
+- **ПОСТОЯННО ГОРИТ** (active LOW) - будильник установлен и активен
+- **МИГАЕТ (500мс)** - таймер работает
+- **ВЫКЛЮЧЕН** - будильник отключён или сработал
 
-### 🔊 Работа зуммера
+### 🔊 Работа зуммера (УЛУЧШЕНО в v2.0!)
 
 **Паттерн сигнала при срабатывании:**
-- БИП (150 мс)
-- Пауза (150 мс)
-- БИП (150 мс)
-- Пауза (150 мс)
-- БИП (150 мс)
-- Длинная пауза (1250 мс)
+- Первый пи: 150мс
+- Пауза: 150мс
+- Второй пи: 150мс
+- Пауза: 150мс
+- Третий пи: 150мс
+- Длинная пауза: 1250мс
 - Повтор...
 
-Результат: "пи-пи-пи... пауза... пи-пи-пи... пауза..."
-
-**Остановка:** Нажмите кнопку BOOT
+**Остановка:** Нажать кнопку BOOT
 
 ### 💾 Хранение данных в NVS
 
 **Автоматически сохраняются:**
-- Параметры WiFi (при использовании команды SAVE)
+- Учётные данные WiFi (при использовании команды SAVE)
 - Настройки часового пояса (при использовании команды SAVE)
 - Настройки NTP сервера (при использовании команды SAVE)
 
 **Сохранение будильника:**
 - Используйте флаг `S` при установке будильника
-- Или нажмите "Save Settings" в веб-интерфейсе
-- Или используйте команду SAVE в Serial
+- Или сохраните текущую конфигурацию командой SAVE
 
 **Примеры:**
 ```bash
@@ -374,387 +394,30 @@ ERASE
 
 ### 📊 Примеры использования
 
-#### Будильник на работу (Пн-Пт, 7:00, повторяющийся)
-
-**Через Serial:**
+#### Рабочий будильник (Пн-Пт, 7:00, повторяющийся)
 ```bash
+# Подключитесь к Serial Monitor (115200 baud)
 > ALARM 12345 07:00 Работа R S
 Alarm set for Weekdays: Mon Tue Wed Thu Fri 07:00 [R] [S] 'Работа'
-Alarm saved to NVS
-```
-
-**Через веб-интерфейс:**
-1. Откройте `http://192.168.x.x`
-2. В секции "Alarm" выберите "Weekdays"
-3. Отметьте Пн-Пт
-4. Установите время 07:00
-5. Введите текст "Работа"
-6. Отметьте "Repeat" и "Save to NVS"
-7. Нажмите "Set Alarm"
-
-#### Таймер для заварки чая (3 минуты)
-
-**Через Serial:**
-```bash
-> TIMER 3:00 Чай
-Timer set for 03:00 seconds, text='Чай'
-```
-
-**Через веб-интерфейс:**
-1. В секции "Timer" установите 00:03:00
-2. Введите текст "Чай"
-3. Нажмите "Start Timer"
-
-#### Настройка для другого часового пояса
-
-**Через веб-интерфейс:**
-1. В секции "System Settings"
-2. Измените "Timezone" на нужное значение (например, -5 для Нью-Йорка)
-3. Нажмите "🔄 Sync Time Now"
-4. Нажмите "💾 Save Settings"
-
-### 🐛 Устранение неисправностей
-
-#### Проблема: Зум# ESP32-C3 0.42" OLED Часы с WiFi, NTP, будильником и таймером
-# ESP32-C3 0.42" OLED Clock with WiFi, NTP, Alarm and Timer
-
-![ESP32-C3 0.42" OLED](https://github.com/CheshirCa/ESP32-C3-Clock/blob/main/ESP32-C3-Clock.jpg)
-![ESP32-C3 0.42" OLED with buzzer HCM1203X pinout](https://github.com/CheshirCa/ESP32-C3-Clock/blob/main/ESP32-C3-Buzzer.jpg)
-
-[English version below](#english-version) | [Русская версия](#Русская-версия)
-
----
-
-## Русская версия
-
-### 📋 Описание
-
-Проект часов на базе **ESP32-C3 SuperMini с встроенным OLED-дисплеем 0.42" (72x40 пикселей)**, поддержкой WiFi, NTP-синхронизацией времени, будильником и таймером. Устройство сохраняет настройки в энергонезависимой памяти (NVS) и управляется через серийный терминал и встроенную кнопку BOOT.
-
-### ✨ Возможности
-
-- ⏰ **Часы реального времени** с синхронизацией через NTP
-- 📡 **WiFi подключение** с сохранением настроек
-- 🔔 **Гибкий будильник:**
-  - Ежедневный
-  - По дням недели (Пн-Вс, любая комбинация)
-  - На конкретную дату
-  - С текстовым сообщением (до 10 символов)
-  - Повторяющийся или одноразовый
-  - Сохранение в NVS
-- ⏲️ **Таймер обратного отсчета:**
-  - От 1 секунды до 24 часов
-  - С текстовым сообщением
-  - Форматы: HH:MM:SS, MM:SS или SS
-- 💾 **Энергонезависимое хранение** настроек WiFi, часового пояса и будильника
-- 🔵 **Светодиодная индикация** активного будильника
-- 🔊 **Звуковые сигналы** пьезоизлучателем
-- 📟 **Информационные экраны** с детальной статистикой
-
-### 🔧 Аппаратная часть
-
-**Плата:** ESP32-C3 SuperMini с встроенным OLED 0.42" (72x40)
-
-**Характеристики платы:**
-- Процессор: ESP32-C3 RISC-V @ 160MHz
-- ОЗУ: 400 KB SRAM
-- Flash: 4 MB
-- Встроенный OLED дисплей 0.42" (72x40 пикселей)
-- Встроенная кнопка BOOT (GPIO9)
-- Встроенный синий светодиод (GPIO8)
-- USB Type-C для питания и программирования
-
-**Распиновка встроенных компонентов:**
-
-| Компонент | GPIO | Примечание |
-|-----------|------|-----------|
-| OLED SDA | GPIO5 | I2C Data |
-| OLED SCL | GPIO6 | I2C Clock |
-| Кнопка BOOT | GPIO9 | С внутренним подтягивающим резистором |
-| Синий LED | GPIO8 | Активный низкий уровень |
-| Зуммер HCM1203X | GPIO10 | Активный пьезоизлучатель |
-
-**⚠️ ВАЖНО: Подключение зуммера HCM1203X**
-- Это **активный** пьезоизлучатель (со встроенным генератором)
-- Подключение: GPIO10 (pin 16) → "+" зуммера, GND (pin 2) → "-" зуммера
-- Напряжение: 3.3V
-- Потребление: ~30 мА
-- **Полярность критична!** Если не работает - поменяйте местами контакты
-
-### 📚 Необходимые библиотеки
-
-Установите через Arduino Library Manager:
-
-1. **U8g2** by olikraus (для OLED дисплея)
-2. **WiFi** (встроенная в ESP32)
-3. **Preferences** (встроенная в ESP32)
-
-### 🚀 Быстрый старт
-
-1. **Настройте WiFi в коде** (или через Serial после загрузки):
-   ```cpp
-   String defSSID = "your_SSID";        // Ваш WiFi SSID
-   String defPASS = "your_PASSWORD";    // Ваш WiFi пароль
-   ```
-
-2. **Настройте часовой пояс** (по умолчанию GMT+3):
-   ```cpp
-   long defGMTOffset = 3 * 3600;        // GMT+3 (Москва)
-   long defDaylightOffset = 0;          // Летнее время (0 = выкл)
-   ```
-
-3. **Загрузите скетч** на ESP32-C3
-
-4. **Откройте Serial Monitor** (115200 baud, NL&CR)
-
-5. **Проверьте подключение:**
-   ```
-   STATUS
-   ```
-
-### 💻 Команды Serial-терминала
-
-**Подключение:** 115200 baud, Newline & Carriage Return (NL&CR)
-
-#### Справка и статус
-```
-HELP                    - Показать все доступные команды
-STATUS                  - Показать детальный статус системы
-SYNC                    - Принудительная синхронизация времени с NTP
-REBOOT                  - Перезагрузить устройство
-```
-
-#### Настройка WiFi
-```
-WIFI <SSID> <пароль>    - Установить параметры WiFi
-SAVE                    - Сохранить настройки в NVS
-RESTORE                 - Загрузить настройки из NVS
-ERASE                   - Очистить все настройки в NVS
-```
-
-**Примеры:**
-```
-WIFI MyHomeWiFi password123
-SAVE
-```
-
-#### Настройка времени
-```
-TIME YYYY-MM-DD HH:MM:SS - Установить время вручную
-NTP <сервер>             - Изменить NTP-сервер (по умолчанию: pool.ntp.org)
-TZ <±часы>               - Установить часовой пояс
-DST <±часы>              - Установить смещение летнего времени
-```
-
-**Примеры:**
-```
-TIME 2025-01-15 14:30:00
-NTP time.google.com
-TZ +3                     # GMT+3 (Москва)
-TZ -5                     # GMT-5 (Нью-Йорк)
-DST +1                    # Летнее время +1 час
-```
-
-#### Будильник
-
-**Формат команды:**
-```
-ALARM [дата/дни] HH:MM [ТЕКСТ] [R] [S]
-```
-
-**Параметры:**
-- `HH:MM` - время срабатывания (обязательно)
-- `YYYY-MM-DD` - конкретная дата (опционально)
-- `1234567` - дни недели: 1=Пн, 2=Вт, 3=Ср, 4=Чт, 5=Пт, 6=Сб, 7=Вс (опционально)
-- `ТЕКСТ` - текст сообщения до 10 символов (опционально)
-- `R` - повторять после срабатывания (опционально)
-- `S` - сохранить в NVS (опционально)
-
-**Примеры:**
-
-```bash
-# Ежедневный будильник в 07:00
-ALARM 07:00
-
-# Будильник в 08:30 с текстом "Work"
-ALARM 08:30 Work
-
-# Будильник на конкретную дату
-ALARM 2025-12-31 23:59 NewYear
-
-# Будильник по будням (Пн-Пт) в 07:00, повторяющийся, с сохранением
-ALARM 12345 07:00 Wake R S
-
-# Будильник на выходные (Сб-Вс)
-ALARM 67 10:00 Weekend
-
-# Только в понедельник
-ALARM 1 09:00 Monday
-
-# Очистить будильник
-ALARM CLEAR
-```
-
-**Важно:**
-- Если начинается с цифр 1-7 БЕЗ двоеточия, то это дни недели
-- Если начинается с времени (например, 17:00), то это ежедневный будильник
-- Флаги `R` и `S` - отдельные, не регистрозависимые буквы
-- Текст не должен начинаться с букв `R` или `S` (иначе будет воспринят как флаг)
-
-#### Таймер
-
-**Форматы команды:**
-```
-TIMER HH:MM:SS [ТЕКСТ]   - Часы:Минуты:Секунды
-TIMER MM:SS [ТЕКСТ]      - Минуты:Секунды
-TIMER SS [ТЕКСТ]         - Секунды
-TIMER CLEAR              - Очистить таймер
-```
-
-**Примеры:**
-```bash
-# 5 минут
-TIMER 5:00
-TIMER 300
-
-# 1 час 30 минут
-TIMER 1:30:00
-TIMER 90:00
-
-# 3 часа с текстом
-TIMER 3:00:00 Meeting
-
-# 45 секунд
-TIMER 45
-
-# Очистить таймер
-TIMER CLEAR
-```
-
-**Ограничения:**
-- Минимум: 1 секунда
-- Максимум: 24 часа (86400 секунд)
-
-### 🖥️ Работа с дисплеем
-
-#### Главный экран
-```
-  ┌──────────────┐
-  │   14:30      │  ← Время (двоеточие мигает)
-  │ 15.01.2025 * │  ← Дата, * = будильник активен
-  └──────────────┘
-```
-
-**Индикаторы:**
-- `*` - активен будильник
-- `#` - активен таймер
-
-#### Info Screen 1 (нажмите BOOT 1 раз)
-```
-INFO 1/2
-Day: Wed
-Alarm: 07:00
-Timer: 45 sec
-WiFi: ON
-```
-
-#### Info Screen 2 (нажмите BOOT 2 раза)
-```
-INFO 2/2
-SSID: MyHomeWiFi
-IP: 192.168.1.100
-Time: SYNC
-RAM: 285 KB
-```
-
-**Автовозврат:** Через 10 секунд автоматически возвращается к главному экрану
-
-#### Экран срабатывания
-
-Когда срабатывает будильник или таймер:
-```
-  ┌──────────────┐
-  │    ALARM     │  ← или текст будильника/таймера
-  │              │
-  │ BOOT to STOP │  ← Нажмите BOOT для остановки
-  └──────────────┘
-```
-
-### 🎮 Управление кнопкой BOOT
-
-| Экран | Действие | Результат |
-|-------|----------|-----------|
-| Главный экран | 1x нажатие | Info Screen 1 |
-| Info Screen 1 | 1x нажатие | Info Screen 2 |
-| Info Screen 2 | 1x нажатие | Возврат на главный экран |
-| Будильник/Таймер | 1x нажатие | Остановить сигнал |
-
-### 💡 Индикация синим светодиодом
-
-- **Горит** (активный LOW) - будильник установлен и активен
-- **Не горит** - будильник выключен или сработал
-
-### 🔊 Работа зуммера
-
-**Паттерн сигнала при срабатывании:**
-- 1 секунда ВКЛ
-- 1 секунда ВЫКЛ
-- 1 секунда ВКЛ
-- 2 секунды ВЫКЛ
-- Повтор...
-
-**Остановка:** Нажмите кнопку BOOT
-
-### 💾 Хранение данных в NVS
-
-**Автоматически сохраняются:**
-- Параметры WiFi (при использовании команды SAVE)
-- Настройки часового пояса (при использовании команды SAVE)
-- Настройки NTP сервера (при использовании команды SAVE)
-
-**Сохранение будильника:**
-- Используйте флаг `S` при установке будильника
-- Или сохраните текущую конфигурацию командой SAVE
-
-**Примеры:**
-```bash
-# Установить будильник и сохранить
-ALARM 07:00 Work R S
-
-# Настроить WiFi и сохранить
-WIFI MyNetwork password123
-SAVE
-
-# Очистить все настройки
-ERASE
-```
-
-### 📊 Примеры использования
-
-#### Будильник на работу (Пн-Пт, 7:00, повторяющийся)
-```bash
-# Подключение к Serial Monitor (115200 baud)
-> ALARM 12345 07:00 Work R S
-Alarm set for Weekdays: Mon Tue Wed Thu Fri 07:00 [R] [S] 'Work'
 Alarm saved to NVS
 
 > STATUS
 === SYSTEM STATUS ===
 ...
-Alarm: Weekdays: MonTueWedThuFri 07:00 [R] [S] 'Work'
+Alarm: Weekdays: MonTueWedThuFri 07:00 [R] [S] 'Работа'
 ...
 ```
 
-#### Таймер для заварки чая (3 минуты)
+#### Таймер для чая (3 минуты)
 ```bash
-> TIMER 3:00 Tea
-Timer set for 03:00 seconds, text='Tea'
+> TIMER 3:00 Чай
+Timer set for 03:00 seconds, text='Чай'
 ```
 
-#### Будильник на Новый Год
+#### Новогодний будильник
 ```bash
-> ALARM 2025-12-31 23:59 NewYear S
-Alarm set for 2025-12-31 23:59 [S] 'NewYear'
+> ALARM 2025-12-31 23:59 НовыйГод S
+Alarm set for 2025-12-31 23:59 [S] 'НовыйГод'
 Alarm saved to NVS
 ```
 
@@ -777,32 +440,32 @@ GMT offset set to +9 hours
 Config saved
 ```
 
-### 🐛 Устранение неисправностей
+### 🐛 Устранение неполадок
 
 #### Проблема: Зуммер не работает
 **Решение:**
-1. Проверьте полярность подключения HCM1203X
-2. GPIO10 должен быть подключен к "+" зуммера
-3. GND должен быть подключен к "-" зуммера
+1. Проверьте полярность HCM1203X
+2. GPIO10 должен быть подключён к "+" зуммера
+3. GND должен быть подключён к "-" зуммера
 4. Если не работает - попробуйте поменять контакты местами
-5. Проверьте, что используется активный зуммер (со встроенным генератором)
+5. Убедитесь, что используете активный зуммер (со встроенным генератором)
 
 #### Проблема: Дисплей не работает или показывает мусор
 **Решение:**
-1. Проверьте подключение I2C (SDA=GPIO5, SCL=GPIO6)
-2. Убедитесь, что библиотека U8g2 установлена
+1. Проверьте I2C соединения (SDA=GPIO5, SCL=GPIO6)
+2. Убедитесь, что установлена библиотека U8g2
 3. Проверьте напряжение питания (должно быть 3.3V)
 
-#### Проблема: Не подключается к WiFi
+#### Проблема: Не могу подключиться к WiFi
 **Решение:**
 1. Проверьте SSID и пароль
-2. Убедитесь, что используется WiFi 2.4 GHz (ESP32-C3 не поддерживает 5 GHz)
-3. Используйте команду `WIFI SSID password` для перенастройки
+2. Убедитесь, что используете WiFi 2.4 ГГц (ESP32-C3 не поддерживает 5 ГГц)
+3. Используйте команду `WIFI SSID пароль` для переконфигурации
 4. Проверьте доступность сети командой `STATUS`
 
 #### Проблема: Время не синхронизируется
 **Решение:**
-1. Проверьте подключение к интернету
+1. Проверьте интернет-соединение
 2. Используйте команду `SYNC` для принудительной синхронизации
 3. Попробуйте другой NTP сервер: `NTP time.google.com`
 4. Проверьте настройки часового пояса: `TZ +3`
@@ -818,56 +481,211 @@ Config saved
 **Решение:**
 1. Используйте команду `SAVE` после изменения настроек
 2. Для будильника используйте флаг `S`: `ALARM 07:00 S`
-3. Проверьте, что NVS не повреждена: `ERASE`, затем заново настройте
+3. Проверьте, не повреждён ли NVS: `ERASE`, затем переконфигурируйте
 
-### 📝 Известные особенности
+### 📝 Известные ограничения
 
-1. **WiFi 5 GHz не поддерживается** - ESP32-C3 работает только с 2.4 GHz
-2. **Максимальная длина текста** будильника/таймера - 10 символов
+1. **WiFi 5 ГГц не поддерживается** - ESP32-C3 работает только с 2.4 ГГц
+2. **Максимальная длина текста** для будильника/таймера - 30 байт (~15 символов кириллицы)
 3. **Один активный будильник** - можно установить только один будильник одновременно
 4. **Один активный таймер** - можно установить только один таймер одновременно
 5. **Автовозврат** с информационных экранов через 10 секунд
-6. **Синхронизация времени** происходит при старте и может быть вызвана командой `SYNC`
+6. **Синхронизация времени** происходит при запуске и может быть вызвана командой `SYNC`
 
-### 📄 Лицензия
+### 🎯 Советы по продвинутому использованию
 
-MIT License - свободное использование, модификация и распространение
+#### Создание сложных расписаний будильников
 
-### 🤝 Вклад в проект
+Поскольку активен только один будильник, используйте эти стратегии:
 
-Приветствуются pull requests! Для значительных изменений сначала откройте issue для обсуждения.
+**Утро в будни + Выходные:**
+```bash
+# Утро понедельник - пятница
+ALARM 12345 07:00 Работа R S
+
+# Когда наступят выходные, установите вручную:
+ALARM 67 10:00 Выходной
+```
+
+**Ежемесячные напоминания:**
+```bash
+# Установить будильник на конкретную дату
+ALARM 2025-02-01 09:00 Квартплата S
+
+# После срабатывания установить на следующий месяц
+ALARM 2025-03-01 09:00 Квартплата S
+```
+
+#### Использование таймера для техники Pomodoro
+
+```bash
+# Рабочая сессия (25 минут)
+TIMER 25:00 Работа
+
+# После работы установить перерыв (5 минут)
+TIMER 5:00 Перерыв
+
+# Длинный перерыв (15 минут)
+TIMER 15:00 ДлинныйПерерыв
+```
+
+#### Несколько NTP серверов для надёжности
+
+Если основной NTP сервер недоступен:
+```bash
+NTP pool.ntp.org        # Основной
+NTP time.google.com     # Резервный
+NTP time.cloudflare.com # Альтернативный
+```
+
+### 🔐 Соображения безопасности
+
+1. **Учётные данные WiFi** хранятся в открытом виде в NVS
+2. **Serial консоль** не защищена - любой с доступом к USB может управлять устройством
+3. Для промышленного использования рассмотрите:
+   - Добавление аутентификации для serial команд
+   - Шифрование чувствительных данных в NVS
+   - Отключение serial консоли в финальных сборках
+
+### 📚 Технические детали
+
+#### Использование памяти
+
+Типичный объём памяти:
+- **Flash:** ~1.2 MB (программный код)
+- **SRAM:** ~115 KB использовано, ~285 KB свободно
+- **NVS:** ~1-2 KB (хранение настроек)
+
+#### Энергопотребление
+
+Приблизительные значения:
+- **В покое с WiFi:** ~80 мА @ 3.3V
+- **Активный дисплей:** +20 мА
+- **Активный зуммер:** +30 мА
+- **Глубокий сон:** Не реализован (устройство всегда включено)
+
+#### Скорость шины I2C
+
+- Настроена на 400 кГц (быстрый режим) для OLED дисплея
+- Может быть снижена до 100 кГц при возникновении проблем
+
+### 📖 Структура кода
+
+```
+ESP32-C3-Clock_new.ino (v2.0)
+├── Setup & Configuration
+│   ├── Hardware initialization
+│   ├── WiFi connection
+│   ├── Web server initialization
+│   └── NTP synchronization
+│
+├── Web Server Functions (НОВОЕ в v2.0!)
+│   ├── setupWebServer()
+│   ├── handleRoot()
+│   ├── handleStatus()
+│   ├── handleAlarm()
+│   └── handleTimer()
+│
+├── NVS Functions
+│   ├── loadConfigFromNVS()
+│   ├── saveConfigToNVS()
+│   ├── loadAlarmFromNVS()
+│   └── saveAlarmToNVS()
+│
+├── Serial Command Handler
+│   ├── handleSerial()
+│   ├── Command history (НОВОЕ в v2.0!)
+│   └── Command parsing
+│
+├── Time Functions
+│   ├── updateClockStrings()
+│   ├── syncTime()
+│   └── setManualTime()
+│
+├── Display Functions
+│   ├── drawClock()
+│   ├── drawAlarmOrTimer()
+│   ├── drawInfoScreen1()
+│   └── drawInfoScreen2()
+│
+├── Alarm & Timer Logic
+│   ├── checkAlarmMatch()
+│   ├── updateAlarmIndicator() (УЛУЧШЕНО в v2.0!)
+│   └── High-precision timer (esp_timer) (НОВОЕ в v2.0!)
+│
+└── Main Loop
+    ├── Web server handling (НОВОЕ в v2.0!)
+    ├── Serial handling
+    ├── Button handling
+    ├── Time updates
+    ├── LED blinking for timer (НОВОЕ в v2.0!)
+    ├── Alarm/Timer checks
+    └── Display updates
+```
 
 ### 📧 Контакты
 
-GitHub: [@CheshirCa](https://github.com/CheshirCa)
+- GitHub: [@CheshirCa](https://github.com/CheshirCa)
+- Ссылка на проект: [https://github.com/CheshirCa/ESP32-C3-Clock](https://github.com/CheshirCa/ESP32-C3-Clock)
+
+### ⭐ История звёзд
+
+Если этот проект вам помог, пожалуйста, поставьте звезду на GitHub!
 
 ---
 
-## English Version
+## English version
+
+## 🆕 Version 2.0
+
+### What's new in version 2.0:
+
+- 🌐 **Web Interface** - full-featured browser-based control
+- 🔵 **Improved LED indication:**
+  - Solid ON = alarm is active
+  - Blinking (500ms) = timer is running
+- 🔊 **New buzzer pattern:** three short beeps (150ms) with pauses, then long pause
+- ⏲️ **High-precision timer** based on `esp_timer` (microsecond accuracy)
+- 📜 **Command history** in Serial terminal with ↑/↓ arrow navigation (10 commands)
+- 🎨 **Enhanced web interface:**
+  - Auto-refresh data every 2 seconds
+  - Responsive design for all devices
+  - Full UTF-8 support (Cyrillic characters)
+  - Confirmation for critical operations
+- 🔧 **Extended control:**
+  - Real-time timer countdown display
+  - Time sync status in web interface
+  - Free memory information
 
 ### 📋 Description
 
-Clock project based on **ESP32-C3 SuperMini with built-in 0.42" OLED display (72x40 pixels)**, featuring WiFi support, NTP time synchronization, alarm, and timer functions. The device stores settings in non-volatile storage (NVS) and can be controlled via serial terminal and built-in BOOT button.
+ESP32-C3 SuperMini clock project with **built-in 0.42" OLED display (72x40 pixels)**, WiFi connectivity, NTP time synchronization, alarm and timer. The device stores settings in non-volatile storage (NVS) and is controlled via serial terminal, built-in BOOT button, and **web interface**.
 
 ### ✨ Features
 
 - ⏰ **Real-time clock** with NTP synchronization
-- 📡 **WiFi connection** with persistent settings
+- 📡 **WiFi connectivity** with persistent settings
+- 🌐 **Web interface** for remote control
 - 🔔 **Flexible alarm:**
   - Daily
-  - By weekdays (Mon-Sun, any combination)
+  - Weekdays (Mon-Sun, any combination)
   - Specific date
-  - With text message (up to 10 characters)
+  - Text message (up to 30 bytes, ~10 characters in English)
   - Repeating or one-time
-  - NVS storage
+  - Save to NVS
 - ⏲️ **Countdown timer:**
   - From 1 second to 24 hours
-  - With text message
+  - Text message
   - Formats: HH:MM:SS, MM:SS or SS
+  - High-precision counting based on esp_timer (microsecond accuracy)
 - 💾 **Non-volatile storage** of WiFi, timezone and alarm settings
-- 🔵 **LED indicator** for active alarm
-- 🔊 **Sound alerts** via piezo buzzer
-- 📟 **Info screens** with detailed statistics
+- 🔵 **LED indication:**
+  - Solid ON = alarm is active
+  - Blinking (500ms) = timer is running
+- 🔊 **Buzzer alerts** with piezo buzzer (beep-beep-beep pattern)
+- 📟 **Information screens** with detailed statistics
+- 🔤 **UTF-8 support** (Cyrillic and Latin)
+- 📜 **Command history** in Serial terminal (up/down arrows, 10 commands)
 
 ### 🔧 Hardware
 
@@ -877,7 +695,7 @@ Clock project based on **ESP32-C3 SuperMini with built-in 0.42" OLED display (72
 - Processor: ESP32-C3 RISC-V @ 160MHz
 - RAM: 400 KB SRAM
 - Flash: 4 MB
-- Built-in 0.42" OLED display (72x40 pixels)
+- Built-in OLED display 0.42" (72x40 pixels)
 - Built-in BOOT button (GPIO9)
 - Built-in blue LED (GPIO8)
 - USB Type-C for power and programming
@@ -888,28 +706,29 @@ Clock project based on **ESP32-C3 SuperMini with built-in 0.42" OLED display (72
 |-----------|------|------|
 | OLED SDA | GPIO5 | I2C Data |
 | OLED SCL | GPIO6 | I2C Clock |
-| BOOT button | GPIO9 | Internal pull-up |
+| BOOT button | GPIO9 | With internal pull-up resistor |
 | Blue LED | GPIO8 | Active low |
-| HCM1203X Buzzer | GPIO10 | Active piezo buzzer |
+| Buzzer HCM1203X | GPIO10 | Active piezo buzzer |
 
-**⚠️ IMPORTANT: HCM1203X Buzzer Connection**
-- This is an **active** piezo buzzer (with built-in generator)
+**⚠️ IMPORTANT: HCM1203X buzzer connection**
+- This is an **active** piezo buzzer (with built-in oscillator)
 - Connection: GPIO10 (pin 16) → "+" buzzer, GND (pin 2) → "-" buzzer
 - Voltage: 3.3V
 - Current: ~30 mA
-- **Polarity is critical!** If not working - reverse the connections
+- **Polarity is critical!** If not working - swap the connections
 
 ### 📚 Required Libraries
 
 Install via Arduino Library Manager:
 
 1. **U8g2** by olikraus (for OLED display)
-2. **WiFi** (built-in for ESP32)
-3. **Preferences** (built-in for ESP32)
+2. **WiFi** (built-in ESP32)
+3. **WebServer** (built-in ESP32)
+4. **Preferences** (built-in ESP32)
 
 ### 🚀 Quick Start
 
-1. **Configure WiFi in code** (or via Serial after upload):
+1. **Configure WiFi in code** (or via Serial/Web after upload):
    ```cpp
    String defSSID = "your_SSID";        // Your WiFi SSID
    String defPASS = "your_PASSWORD";    // Your WiFi password
@@ -918,36 +737,81 @@ Install via Arduino Library Manager:
 2. **Configure timezone** (default GMT+3):
    ```cpp
    long defGMTOffset = 3 * 3600;        // GMT+3 (Moscow)
-   long defDaylightOffset = 0;          // Daylight saving (0 = off)
+   long defDaylightOffset = 0;          // DST (0 = off)
    ```
 
 3. **Upload sketch** to ESP32-C3
 
-4. **Open Serial Monitor** (115200 baud, NL&CR)
+4. **Open Serial Monitor** (115200 baud, NL&CR) or **web browser**
 
-5. **Check connection:**
-   ```
-   STATUS
-   ```
+5. **For web interface:**
+   - Get IP address from Serial Monitor
+   - Open `http://192.168.x.x` in browser
+   - Control your clock through convenient interface!
+
+### 🌐 Web Interface (NEW in v2.0!)
+
+After connecting to WiFi, open the device's IP address in a browser for full-featured web interface access.
+
+#### Web interface features:
+
+**📊 Main page:**
+- Current time (large font)
+- Date and day of week
+- WiFi SSID and connection status
+- IP address
+- Time sync status
+- Free memory information
+
+**🔔 Alarm control:**
+- Type selection: daily / weekdays / specific date
+- Time setting
+- Text message (Cyrillic support!)
+- Repeat and save to NVS flags
+- Display of current active alarm
+
+**⏲️ Timer control:**
+- Duration setting (HH:MM:SS)
+- Text message
+- Real-time remaining time display
+
+**⚙️ System settings:**
+- Change NTP server
+- Configure timezone (GMT offset)
+- Configure daylight saving time (DST offset)
+- Force sync button
+- Manual time setting
+- Save/restore settings from NVS
+- Clear NVS
+- Reboot device
+
+**🎨 Interface features:**
+- Responsive design (works on phone, tablet, PC)
+- Auto-refresh data every 2 seconds
+- Modern gradient design
+- Confirmation for destructive operations
+- UTF-8 support (type text in any language!)
 
 ### 💻 Serial Terminal Commands
 
 **Connection:** 115200 baud, Newline & Carriage Return (NL&CR)
 
-#### Help and Status
+**Command history (NEW in v2.0!):** Use ↑/↓ arrows to navigate history (last 10 commands)
+
+#### Help and status
 ```
 HELP                    - Show all available commands
 STATUS                  - Show detailed system status
-SYNC                    - Force NTP time synchronization
+SYNC                    - Force time synchronization with NTP
 REBOOT                  - Reboot device
 ```
 
-#### WiFi Settings
+#### WiFi setup
 ```
-WIFI <SSID> <password>  - Set WiFi credentials
+WIFI <SSID> <password>  - Set WiFi parameters
 SAVE                    - Save settings to NVS
-RESTORE                 - Restore settings from NVS
-ERASE                   - Erase all settings from NVS
+RESTORE                 - Load settings from NVS
+ERASE                   - Clear all settings in NVS
 ```
 
 **Examples:**
@@ -956,12 +820,12 @@ WIFI MyHomeWiFi password123
 SAVE
 ```
 
-#### Time Settings
+#### Time setup
 ```
 TIME YYYY-MM-DD HH:MM:SS - Set time manually
 NTP <server>             - Change NTP server (default: pool.ntp.org)
 TZ <±hours>              - Set timezone
-DST <±hours>             - Set daylight saving offset
+DST <±hours>             - Set daylight saving time offset
 ```
 
 **Examples:**
@@ -984,7 +848,7 @@ ALARM [date/days] HH:MM [TEXT] [R] [S]
 - `HH:MM` - trigger time (required)
 - `YYYY-MM-DD` - specific date (optional)
 - `1234567` - weekdays: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun (optional)
-- `TEXT` - message text up to 10 characters (optional)
+- `TEXT` - message text up to 30 bytes (~10 characters) (optional)
 - `R` - repeat after trigger (optional)
 - `S` - save to NVS (optional)
 
@@ -1000,8 +864,8 @@ ALARM 08:30 Work
 # Alarm on specific date
 ALARM 2025-12-31 23:59 NewYear
 
-# Weekday alarm (Mon-Fri) at 07:00, repeating, saved
-ALARM 12345 07:00 Wake R S
+# Weekday alarm (Mon-Fri) at 07:00, repeating, with save
+ALARM 12345 07:00 WakeUp R S
 
 # Weekend alarm (Sat-Sun)
 ALARM 67 10:00 Weekend
@@ -1014,8 +878,8 @@ ALARM CLEAR
 ```
 
 **Important:**
-- If starts with digits 1-7 WITHOUT colon, it's weekdays
-- If starts with time (e.g., 17:00), it's daily alarm
+- If starts with digits 1-7 WITHOUT colon, these are weekdays
+- If starts with time (e.g., 17:00), this is a daily alarm
 - Flags `R` and `S` are separate, case-insensitive letters
 - Text should not start with letters `R` or `S` (will be treated as flag)
 
@@ -1045,27 +909,30 @@ TIMER 3:00:00 Meeting
 # 45 seconds
 TIMER 45
 
+# With text
+TIMER 3:00 Tea
+
 # Clear timer
 TIMER CLEAR
 ```
 
-**Limits:**
+**Limitations:**
 - Minimum: 1 second
 - Maximum: 24 hours (86400 seconds)
 
 ### 🖥️ Display Operation
 
-#### Main Screen
+#### Main screen
 ```
   ┌──────────────┐
-  │   14:30      │  ← Time (colon blinks)
+  │   14:30      │  ← Time (blinking colon)
   │ 15.01.2025 * │  ← Date, * = alarm active
   └──────────────┘
 ```
 
 **Indicators:**
-- `*` - alarm is active
-- `#` - timer is active
+- `*` - alarm active
+- `#` - timer active
 
 #### Info Screen 1 (press BOOT once)
 ```
@@ -1107,18 +974,21 @@ When alarm or timer triggers:
 | Info Screen 2 | 1x press | Return to main screen |
 | Alarm/Timer | 1x press | Stop signal |
 
-### 💡 Blue LED Indication
+### 💡 Blue LED Indication (IMPROVED in v2.0!)
 
-- **ON** (active LOW) - alarm is set and active
+- **SOLID ON** (active LOW) - alarm is set and active
+- **BLINKING (500ms)** - timer is running
 - **OFF** - alarm is disabled or triggered
 
-### 🔊 Buzzer Operation
+### 🔊 Buzzer Operation (IMPROVED in v2.0!)
 
 **Signal pattern when triggered:**
-- 1 second ON
-- 1 second OFF
-- 1 second ON
-- 2 seconds OFF
+- First beep: 150ms
+- Pause: 150ms
+- Second beep: 150ms
+- Pause: 150ms
+- Third beep: 150ms
+- Long pause: 1250ms
 - Repeat...
 
 **Stop:** Press BOOT button
@@ -1241,7 +1111,7 @@ Config saved
 ### 📝 Known Limitations
 
 1. **WiFi 5 GHz not supported** - ESP32-C3 only works with 2.4 GHz
-2. **Maximum text length** for alarm/timer - 10 characters
+2. **Maximum text length** for alarm/timer - 30 bytes (~10 characters)
 3. **Single active alarm** - only one alarm can be set at a time
 4. **Single active timer** - only one timer can be set at a time
 5. **Auto-return** from info screens after 10 seconds
@@ -1302,23 +1172,6 @@ NTP time.cloudflare.com # Alternative
    - Encrypting sensitive data in NVS
    - Disabling serial console in final builds
 
-### 🛠️ Customization Ideas
-
-#### Hardware Modifications
-
-1. **External RTC module** (DS3231) for time keeping during power loss
-2. **Temperature sensor** (DHT22) to display room temperature
-3. **Light sensor** (BH1750) for auto-brightness control
-4. **Larger display** (0.96" or 1.3" OLED) for more information
-
-#### Software Enhancements
-
-1. **Multiple alarms** - modify alarm structure to support array of alarms
-2. **Snooze function** - add temporary delay to alarm
-3. **Fade in alarm** - gradually increase buzzer volume
-4. **Web interface** - add HTTP server for web-based configuration
-5. **MQTT integration** - send notifications to home automation system
-
 ### 📚 Technical Details
 
 #### Memory Usage
@@ -1344,11 +1197,19 @@ Approximate values:
 ### 📖 Code Structure
 
 ```
-ESP32-C3-Clock.ino
+ESP32-C3-Clock_new.ino (v2.0)
 ├── Setup & Configuration
 │   ├── Hardware initialization
 │   ├── WiFi connection
+│   ├── Web server initialization (NEW in v2.0!)
 │   └── NTP synchronization
+│
+├── Web Server Functions (NEW in v2.0!)
+│   ├── setupWebServer()
+│   ├── handleRoot()
+│   ├── handleStatus()
+│   ├── handleAlarm()
+│   └── handleTimer()
 │
 ├── NVS Functions
 │   ├── loadConfigFromNVS()
@@ -1358,6 +1219,7 @@ ESP32-C3-Clock.ino
 │
 ├── Serial Command Handler
 │   ├── handleSerial()
+│   ├── Command history (NEW in v2.0!)
 │   └── Command parsing
 │
 ├── Time Functions
@@ -1373,12 +1235,15 @@ ESP32-C3-Clock.ino
 │
 ├── Alarm & Timer Logic
 │   ├── checkAlarmMatch()
-│   └── Timer countdown
+│   ├── updateAlarmIndicator() (IMPROVED in v2.0!)
+│   └── High-precision timer (esp_timer) (NEW in v2.0!)
 │
 └── Main Loop
+    ├── Web server handling (NEW in v2.0!)
     ├── Serial handling
     ├── Button handling
     ├── Time updates
+    ├── LED blinking for timer (NEW in v2.0!)
     ├── Alarm/Timer checks
     └── Display updates
 ```
