@@ -1383,83 +1383,12 @@ ESP32-C3-Clock.ino
     └── Display updates
 ```
 
-### 🔄 Version History
-
-**v1.0** (Current)
-- Initial release
-- Basic clock functionality with NTP sync
-- Alarm with flexible scheduling
-- Timer with countdown
-- NVS storage for settings
-- Serial command interface
-
-### 🎓 Learning Resources
-
-- [ESP32-C3 Documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/)
-- [U8g2 Library Reference](https://github.com/olikraus/u8g2/wiki)
-- [NTP Protocol Overview](https://en.wikipedia.org/wiki/Network_Time_Protocol)
-- [Arduino Time Library](https://www.arduino.cc/reference/en/libraries/time/)
-
-### 📄 License
-
-MIT License - Free to use, modify and distribute
-
-Copyright (c) 2025
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-### 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-**Guidelines:**
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-**Before submitting:**
-- Test your changes thoroughly
-- Update documentation if needed
-- Follow existing code style
-- Add comments for complex logic
-
-### 🐛 Bug Reports
-
-Found a bug? Please open an issue with:
-1. Clear description of the problem
-2. Steps to reproduce
-3. Expected vs actual behavior
-4. Serial monitor output (if applicable)
-5. Your board version and Arduino IDE version
-
-### 💡 Feature Requests
-
-Have an idea? Open an issue with:
-1. Clear description of the feature
-2. Use case / why it's needed
-3. Proposed implementation (optional)
-
 ### 📧 Contact
 
 - GitHub: [@CheshirCa](https://github.com/CheshirCa)
 - Project Link: [https://github.com/CheshirCa/ESP32-C3-Clock](https://github.com/CheshirCa/ESP32-C3-Clock)
 
-### 🙏 Acknowledgments
-
-- **U8g2 Library** by olikraus for excellent OLED display support
-- **ESP32 Arduino Core** team for ESP32-C3 support
-- Community contributors and testers
-
 ### ⭐ Star History
 
 If you find this project helpful, please consider giving it a star on GitHub!
 
----
-
-**Made with ❤️ for the ESP32 community**
