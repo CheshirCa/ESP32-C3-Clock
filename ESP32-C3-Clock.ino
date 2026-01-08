@@ -257,8 +257,13 @@ void eraseNVS() {
 
 void updateAlarmIndicator() {
   // For active LOW: LOW = ON, HIGH = OFF
+  // Note: This function now only updates for alarm, timer indication handled in loop
   bool shouldBeOn = myAlarm.active && !alarmTriggered;
-  digitalWrite(BLUE_LED_PIN, shouldBeOn ? LOW : HIGH);
+  
+  // If timer is active, LED will blink in main loop, so we don't set it here
+  if (!timerActive) {
+    digitalWrite(BLUE_LED_PIN, shouldBeOn ? LOW : HIGH);
+  }
 }
 
 // ================= COMMAND HISTORY FUNCTIONS =================
@@ -384,6 +389,8 @@ void handleSerial() {
     Serial.print(c);  // echo
 
     if (c == '\r' || c == '\n') {
+      Serial.println(); // Перевод строки после команды
+      
       if (serialInput.length() == 0) {
         Serial.print("> ");
         return;
@@ -1220,6 +1227,23 @@ void loop() {
   if (millis() - lastBlink >= 500) {
     colonVisible = !colonVisible;
     lastBlink = millis();
+  }
+
+  // Blue LED control for timer indication
+  static unsigned long lastLedBlink = 0;
+  static bool ledState = false;
+  
+  if (timerActive && !timerTriggered) {
+    // Blink LED for timer (500ms on, 500ms off)
+    if (millis() - lastLedBlink >= 500) {
+      ledState = !ledState;
+      digitalWrite(BLUE_LED_PIN, ledState ? LOW : HIGH);
+      lastLedBlink = millis();
+    }
+  } else {
+    // Normal alarm indication (solid on/off)
+    bool shouldBeOn = myAlarm.active && !alarmTriggered;
+    digitalWrite(BLUE_LED_PIN, shouldBeOn ? LOW : HIGH);
   }
 
   // Update time
