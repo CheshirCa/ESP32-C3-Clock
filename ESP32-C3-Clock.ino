@@ -1,3 +1,27 @@
+/*
+ * ESP32-C3 Clock with OLED Display, WiFi, NTP, Alarm and Timer
+ * 
+ * Features:
+ * - 0.42" OLED display (72x40 pixels)
+ * - WiFi connectivity with NTP time sync
+ * - Flexible alarm (daily, weekdays, specific date)
+ * - Countdown timer (1 second to 24 hours)
+ * - Web interface for remote control
+ * - Non-volatile storage (NVS) for settings
+ * - Command history in serial terminal
+ * - UTF-8 support (Cyrillic and Latin)
+ * 
+ * Hardware:
+ * - ESP32-C3 SuperMini
+ * - Built-in 0.42" OLED (SDA=GPIO5, SCL=GPIO6)
+ * - Built-in BOOT button (GPIO9)
+ * - Built-in blue LED (GPIO8, active low)
+ * - HCM1203X piezo buzzer (GPIO10)
+ * 
+ * Author: CheshirCa
+ * License: MIT
+ */
+
 #include <U8g2lib.h>
 #include <WiFi.h>
 #include <WebServer.h>
@@ -9,21 +33,21 @@
 // Web Server
 WebServer server(80);
 
-// OLED Display (70x40)
+// OLED Display (72x40 visible area in 128x64 buffer)
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 6, 5);
-const int DISP_W = 72;
-const int DISP_H = 40;
-const int X_OFF = 30;
-const int Y_OFF = 20;
+const int DISP_W = 72;          // Display width
+const int DISP_H = 40;          // Display height
+const int X_OFF = 30;           // X offset in buffer
+const int Y_OFF = 20;           // Y offset in buffer
 
-const int INFO_Y_OFFSET = 10;
+const int INFO_Y_OFFSET = 10;  // Info screen Y offset
 
 // Default Configuration
-String defSSID = "your_SSID";
-String defPASS = "your_PASSWORD";
-String defNTP = "pool.ntp.org";
-long defGMTOffset = 3 * 3600;
-long defDaylightOffset = 0;
+String defSSID = "your_SSID";           // Default WiFi SSID
+String defPASS = "your_PASSWORD";       // Default WiFi password
+String defNTP = "pool.ntp.org";         // Default NTP server
+long defGMTOffset = 3 * 3600;           // Default GMT offset (seconds)
+long defDaylightOffset = 0;             // Default DST offset (seconds)
 
 // Active Configuration
 String wifiSSID;
@@ -34,8 +58,8 @@ long daylightOffset_sec;
 
 // NVS Storage
 Preferences prefs;
-const char* PREF_NS = "clockcfg";
-const char* ALARM_PREF_NS = "alarms";
+const char* PREF_NS = "clockcfg";       // NVS namespace for config
+const char* ALARM_PREF_NS = "alarms";   // NVS namespace for alarms
 
 // Time
 struct tm timeinfo;
@@ -53,7 +77,7 @@ ScreenMode currentScreen = SCREEN_CLOCK;
 int infoScreenPage = 1;
 
 // Auto Return
-const unsigned long INFO_TIMEOUT = 10000;
+const unsigned long INFO_TIMEOUT = 10000;  // Auto return timeout (ms)
 unsigned long infoStartTime = 0;
 
 // Blinking Colon
@@ -62,7 +86,7 @@ unsigned long lastBlink = 0;
 
 // Button
 #define BOOT_PIN 9
-const unsigned long BTN_DEBOUNCE = 300;
+const unsigned long BTN_DEBOUNCE = 300;  // Button debounce time (ms)
 unsigned long lastBtnTime = 0;
 
 // Buzzer
@@ -70,10 +94,10 @@ unsigned long lastBtnTime = 0;
 bool buzzerActive = false;
 
 // Time Strings
-char hhStr[3];
-char mmStr[3];
-char dateStr[11];
-char weekdayStr[15];
+char hhStr[3];        // Hours string
+char mmStr[3];        // Minutes string
+char dateStr[11];     // Date string
+char weekdayStr[15];  // Weekday string
 
 // Serial Input
 String serialInput = "";
@@ -82,10 +106,10 @@ bool promptShown = false;
 // Command History
 const int HISTORY_SIZE = 10;
 String commandHistory[HISTORY_SIZE];
-int historyIndex = 0;      // Current position in history
-int historyCount = 0;      // Total commands in history
-int historyBrowseIndex = -1; // Index while browsing (-1 = not browsing)
-String tempInput = "";     // Temporary storage while browsing
+int historyIndex = 0;           // Current position in history
+int historyCount = 0;           // Total commands in history
+int historyBrowseIndex = -1;   // Index while browsing (-1 = not browsing)
+String tempInput = "";          // Temporary storage while browsing
 
 // Alarm Structure
 struct Alarm {
@@ -112,23 +136,26 @@ char timerText[31] = "";  // Timer text (max 30 bytes for UTF-8)
 bool timerTriggered = false;
 bool alarmTriggered = false;
 
-// Weekdays in Russian (for display)
+// Weekdays (for display)
 const char* weekdaysRU[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 // Blue LED for Alarm Indicator
 #define BLUE_LED_PIN 8
-#define LED_ACTIVE_LOW true
+#define LED_ACTIVE_LOW true  // Active low logic
 
 // =================================================
+// ================= SETUP =================
 void setup() {
+  // Initialize GPIO
   pinMode(BOOT_PIN, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
 
-  // Blue LED setup
+  // Initialize blue LED
   pinMode(BLUE_LED_PIN, OUTPUT);
   digitalWrite(BLUE_LED_PIN, HIGH);
 
+  // Initialize serial
   Serial.begin(115200);
   unsigned long start = millis();
   while (!Serial && millis() - start < 2000) delay(10);
@@ -136,13 +163,13 @@ void setup() {
   Serial.println("\n=== ESP32-C3 Clock ===");
   Serial.println("Type HELP for commands");
 
-  // OLED Initialization
+  // Initialize OLED
   u8g2.begin();
   u8g2.setContrast(255);
   u8g2.setBusClock(400000);
   u8g2.enableUTF8Print();
 
-  // Display Test
+  // Display test
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_7x14_tf);
   u8g2.setCursor(30, 30);
@@ -158,7 +185,7 @@ void setup() {
   syncTime();
   updateClockStrings();
   
-  // Start Web Server
+  // Start web server
   setupWebServer();
   server.begin();
   Serial.println("Web server started");
