@@ -347,10 +347,24 @@ String getStatusJSON() {
   json += "\"time\":\"" + String(hhStr) + ":" + String(mmStr) + "\",";
   json += "\"date\":\"" + String(dateStr) + "\",";
   json += "\"weekday\":\"" + String(weekdayStr) + "\",";
+  json += "\"ssid\":\"" + wifiSSID + "\",";
   json += "\"wifi\":\"" + String(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected") + "\",";
   json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
   json += "\"timeSync\":" + String(timeValid ? "true" : "false") + ",";
-  json += "\"freeRam\":" + String(esp_get_free_heap_size() / 1024) + ",";
+  json += "\"ntpServer\":\"" + ntpServer + "\",";
+  json += "\"timezone\":" + String(gmtOffset_sec / 3600) + ",";
+  json += "\"dstOffset\":" + String(daylightOffset_sec / 3600) + ",";
+  
+  // Current full time for manual setting
+  if (timeValid) {
+    char fullTime[20];
+    sprintf(fullTime, "%04d-%02d-%02d %02d:%02d:%02d",
+            timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    json += "\"fullTime\":\"" + String(fullTime) + "\",";
+  } else {
+    json += "\"fullTime\":\"\",";
+  }
   
   // Alarm info
   json += "\"alarm\":{";
@@ -555,7 +569,11 @@ String getWebPage() {
       <div class="date-display" id="date">Loading...</div>
       <div class="status-grid">
         <div class="status-item">
-          <div class="status-label">WiFi</div>
+          <div class="status-label">WiFi SSID</div>
+          <div class="status-value" id="ssid">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">WiFi Status</div>
           <div class="status-value" id="wifi">--</div>
         </div>
         <div class="status-item">
@@ -566,10 +584,44 @@ String getWebPage() {
           <div class="status-label">Time Sync</div>
           <div class="status-value" id="sync">--</div>
         </div>
-        <div class="status-item">
-          <div class="status-label">Free RAM</div>
-          <div class="status-value" id="ram">--</div>
-        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⚙️ System Settings</h2>
+      
+      <div class="form-group">
+        <label>NTP Server</label>
+        <input type="text" id="ntpServer" placeholder="pool.ntp.org">
+      </div>
+      
+      <div class="form-group">
+        <label>Timezone (GMT offset in hours)</label>
+        <input type="number" id="timezone" min="-12" max="14" step="1" placeholder="3">
+      </div>
+      
+      <div class="form-group">
+        <label>DST Offset (hours)</label>
+        <input type="number" id="dstOffset" min="-2" max="2" step="1" placeholder="0">
+      </div>
+      
+      <button onclick="syncTime()">🔄 Sync Time Now</button>
+      
+      <div class="form-group" style="margin-top: 16px;">
+        <label>Manual Time (YYYY-MM-DD HH:MM:SS)</label>
+        <input type="text" id="manualTime" placeholder="2025-01-15 14:30:00">
+      </div>
+      
+      <button onclick="setManualTime()">🕐 Set Manual Time</button>
+      
+      <div class="btn-group" style="margin-top: 16px;">
+        <button onclick="saveSettings()">💾 Save Settings</button>
+        <button onclick="restoreSettings()">📂 Restore Settings</button>
+      </div>
+      
+      <div class="btn-group">
+        <button class="danger" onclick="eraseSettings()">🗑️ Erase NVS</button>
+        <button class="danger" onclick="rebootDevice()">🔄 Reboot</button>
       </div>
     </div>
 
@@ -660,10 +712,18 @@ String getWebPage() {
         .then(data => {
           document.getElementById('clock').textContent = data.time;
           document.getElementById('date').textContent = data.date + ' • ' + data.weekday;
+          document.getElementById('ssid').textContent = data.ssid;
           document.getElementById('wifi').textContent = data.wifi;
           document.getElementById('ip').textContent = data.ip;
           document.getElementById('sync').textContent = data.timeSync ? 'Synced' : 'Not synced';
-          document.getElementById('ram').textContent = data.freeRam + ' KB';
+          
+          // Update settings fields
+          document.getElementById('ntpServer').value = data.ntpServer;
+          document.getElementById('timezone').value = data.timezone;
+          document.getElementById('dstOffset').value = data.dstOffset;
+          if (data.fullTime) {
+            document.getElementById('manualTime').value = data.fullTime;
+          }
           
           // Alarm status
           const alarmDiv = document.getElementById('alarmStatus');
@@ -798,6 +858,81 @@ String getWebPage() {
           alert(data);
           updateStatus();
         });
+    }
+    
+    function syncTime() {
+      const ntp = document.getElementById('ntpServer').value;
+      const tz = document.getElementById('timezone').value;
+      const dst = document.getElementById('dstOffset').value;
+      
+      let url = '/sync';
+      if (ntp) url += '?ntp=' + encodeURIComponent(ntp);
+      if (tz) url += (url.includes('?') ? '&' : '?') + 'tz=' + tz;
+      if (dst) url += '&dst=' + dst;
+      
+      fetch(url)
+        .then(r => r.text())
+        .then(data => {
+          alert(data);
+          updateStatus();
+        });
+    }
+    
+    function setManualTime() {
+      const time = document.getElementById('manualTime').value;
+      if (!time) {
+        alert('Please enter time in format: YYYY-MM-DD HH:MM:SS');
+        return;
+      }
+      
+      fetch('/time?value=' + encodeURIComponent(time))
+        .then(r => r.text())
+        .then(data => {
+          alert(data);
+          updateStatus();
+        });
+    }
+    
+    function saveSettings() {
+      if (confirm('Save current settings to NVS?')) {
+        fetch('/save')
+          .then(r => r.text())
+          .then(data => {
+            alert(data);
+          });
+      }
+    }
+    
+    function restoreSettings() {
+      if (confirm('Restore settings from NVS? This will reload the page.')) {
+        fetch('/restore')
+          .then(r => r.text())
+          .then(data => {
+            alert(data);
+            setTimeout(() => location.reload(), 1000);
+          });
+      }
+    }
+    
+    function eraseSettings() {
+      if (confirm('WARNING: This will erase ALL settings from NVS! Continue?')) {
+        fetch('/erase')
+          .then(r => r.text())
+          .then(data => {
+            alert(data);
+          });
+      }
+    }
+    
+    function rebootDevice() {
+      if (confirm('Reboot the device?')) {
+        fetch('/reboot')
+          .then(r => r.text())
+          .then(data => {
+            alert('Device is rebooting... Please wait 10 seconds.');
+            setTimeout(() => location.reload(), 10000);
+          });
+      }
     }
     
     updateStatus();
@@ -970,6 +1105,84 @@ void setupWebServer() {
     buzzerActive = false;
     digitalWrite(BUZZER_PIN, LOW);
     server.send(200, "text/plain; charset=utf-8", "Timer cleared");
+  });
+  
+  // Sync time
+  server.on("/sync", HTTP_GET, []() {
+    if (server.hasArg("ntp")) {
+      ntpServer = server.arg("ntp");
+    }
+    if (server.hasArg("tz")) {
+      gmtOffset_sec = server.arg("tz").toInt() * 3600;
+    }
+    if (server.hasArg("dst")) {
+      daylightOffset_sec = server.arg("dst").toInt() * 3600;
+    }
+    
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer.c_str());
+    delay(2000); // Wait for sync
+    
+    if (getLocalTime(&timeinfo) && timeinfo.tm_year > 120) {
+      timeValid = true;
+      updateClockStrings();
+      server.send(200, "text/plain; charset=utf-8", "Time synchronized successfully");
+    } else {
+      server.send(500, "text/plain; charset=utf-8", "Time synchronization failed");
+    }
+  });
+  
+  // Set manual time
+  server.on("/time", HTTP_GET, []() {
+    String timeStr = server.arg("value");
+    if (timeStr.length() == 0) {
+      server.send(400, "text/plain; charset=utf-8", "Missing time parameter");
+      return;
+    }
+    
+    struct tm t {};
+    if (sscanf(timeStr.c_str(), "%d-%d-%d %d:%d:%d",
+               &t.tm_year, &t.tm_mon, &t.tm_mday,
+               &t.tm_hour, &t.tm_min, &t.tm_sec) == 6) {
+      t.tm_year -= 1900;
+      t.tm_mon -= 1;
+      
+      time_t tt = mktime(&t);
+      struct timeval now = { tt, 0 };
+      settimeofday(&now, nullptr);
+      timeValid = true;
+      updateClockStrings();
+      server.send(200, "text/plain; charset=utf-8", "Manual time set successfully");
+    } else {
+      server.send(400, "text/plain; charset=utf-8", "Invalid time format. Use: YYYY-MM-DD HH:MM:SS");
+    }
+  });
+  
+  // Save settings
+  server.on("/save", HTTP_GET, []() {
+    saveConfigToNVS();
+    server.send(200, "text/plain; charset=utf-8", "Settings saved to NVS");
+  });
+  
+  // Restore settings
+  server.on("/restore", HTTP_GET, []() {
+    loadConfigFromNVS();
+    connectWiFi();
+    syncTime();
+    updateClockStrings();
+    server.send(200, "text/plain; charset=utf-8", "Settings restored from NVS");
+  });
+  
+  // Erase NVS
+  server.on("/erase", HTTP_GET, []() {
+    eraseNVS();
+    server.send(200, "text/plain; charset=utf-8", "NVS erased successfully");
+  });
+  
+  // Reboot
+  server.on("/reboot", HTTP_GET, []() {
+    server.send(200, "text/plain; charset=utf-8", "Rebooting...");
+    delay(1000);
+    ESP.restart();
   });
 }
 
