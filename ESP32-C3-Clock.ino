@@ -752,6 +752,43 @@ String getWebPage() {
             document.getElementById('manualTime').value = data.fullTime;
           }
           
+          // Update alarm form from current alarm settings
+          if (data.alarm.active) {
+            // Set time
+            const hourStr = (data.alarm.hour < 10 ? '0' : '') + data.alarm.hour;
+            const minStr = (data.alarm.minute < 10 ? '0' : '') + data.alarm.minute;
+            document.getElementById('alarmTime').value = hourStr + ':' + minStr;
+            
+            // Set type and related fields
+            if (data.alarm.type === 'date') {
+              document.getElementById('alarmType').value = 'date';
+              document.getElementById('alarmDate').value = data.alarm.date;
+            } else if (data.alarm.type === 'weekdays') {
+              document.getElementById('alarmType').value = 'weekdays';
+              // Set weekday checkboxes
+              const weekdayMask = data.alarm.weekdays;
+              const checkboxes = document.querySelectorAll('#weekdaysField input[type="checkbox"]');
+              checkboxes.forEach(cb => {
+                const value = parseInt(cb.value);
+                cb.checked = (weekdayMask & value) !== 0;
+              });
+            } else {
+              document.getElementById('alarmType').value = 'daily';
+            }
+            
+            // Set text
+            if (data.alarm.text) {
+              document.getElementById('alarmText').value = data.alarm.text;
+            }
+            
+            // Set flags
+            document.getElementById('alarmRepeat').checked = data.alarm.repeat;
+            document.getElementById('alarmSave').checked = data.alarm.saved;
+            
+            // Update fields visibility
+            updateAlarmFields();
+          }
+          
           // Alarm status
           const alarmDiv = document.getElementById('alarmStatus');
           if (data.alarm.active) {
@@ -780,6 +817,20 @@ String getWebPage() {
             if (data.timer.text && data.timer.text !== 'TIMER') timerText += ' "' + data.timer.text + '"';
             timerDiv.textContent = timerText;
             timerDiv.className = 'timer-info';
+            
+            // Update timer form with remaining time
+            const hours = Math.floor(data.timer.remaining / 3600);
+            const minutes = Math.floor((data.timer.remaining % 3600) / 60);
+            const seconds = data.timer.remaining % 60;
+            const hourStr = (hours < 10 ? '0' : '') + hours;
+            const minStr = (minutes < 10 ? '0' : '') + minutes;
+            const secStr = (seconds < 10 ? '0' : '') + seconds;
+            document.getElementById('timerTime').value = hourStr + ':' + minStr + ':' + secStr;
+            
+            // Update timer text
+            if (data.timer.text && data.timer.text !== 'TIMER') {
+              document.getElementById('timerText').value = data.timer.text;
+            }
           } else {
             timerDiv.textContent = 'No timer active';
             timerDiv.className = 'timer-info inactive';
